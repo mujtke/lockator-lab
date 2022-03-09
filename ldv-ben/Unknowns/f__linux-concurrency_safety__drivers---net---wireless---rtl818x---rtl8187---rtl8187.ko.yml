@@ -1,0 +1,7 @@
+format_version: '1.0'
+
+input_files: 'f__linux-concurrency_safety__drivers---net---wireless---rtl818x---rtl8187---rtl8187.ko.cil.i'
+
+properties:
+  - property_file: ../data-race.prp
+    expected_verdict: true

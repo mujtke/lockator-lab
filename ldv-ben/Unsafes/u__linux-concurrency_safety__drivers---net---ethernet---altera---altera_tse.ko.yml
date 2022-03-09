@@ -1,0 +1,8 @@
+format_version: '1.0'
+
+input_files: 'u__linux-concurrency_safety__drivers---net---ethernet---altera---altera_tse.ko.cil.i'
+# Due to shared analysis
+
+properties:
+  - property_file: ../data-race.prp
+    expected_verdict: true

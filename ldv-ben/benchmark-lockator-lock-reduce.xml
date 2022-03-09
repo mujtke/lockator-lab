@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<!DOCTYPE benchmark PUBLIC "+//IDN sosy-lab.org//DTD BenchExec benchmark 1.0//EN" "http://www.sosy-lab.org/benchexec/benchmark-1.0.dtd">
+<benchmark tool="cpachecker" timelimit="900" hardtimelimit="1000" memlimit="8000 MB" cpuCores="2">
+  <!-- This file contains regression tests from the LDV project.
+       It expects the git repository git@bitbucket.org:dbeyer/ldv-benchmarks.git
+       to be checked out at test/programs/ldv-benchmarks. -->
+
+  <option name="-setprop">statistics.memory=true</option>
+  <option name="-heap">10000M</option>
+  <option name="-setprop">counterexample.export.exportWitness=false</option>
+  <option name="-setprop">cpa.thread.supportSelfCreation=true</option>
+  <option name="-setprop">cpa.arg.export=false</option>
+  <option name="-setprop">counterexample.export.exportAsSource=false</option>
+
+  <propertyfile>./data-race.prp</propertyfile>
+  
+  <tasks name="DeviceDrivers64">
+    <includesfile>Tasks.set</includesfile>
+  </tasks>
+
+  <rundefinition name="none">
+    <option name="-lockator-linux-without-shared"/>
+    <option name="-setprop">cpa.predicate.refinement.predicateBasisStrategy=subgraph</option>
+    <option name="-setprop">cpa.lock.reduceLockCounters=NONE</option>
+    <option name="-setprop">cpa.lock.reduceUselessLocks=false</option>
+  </rundefinition>
+
+  <rundefinition name="block">
+    <option name="-lockator-linux-without-shared"/>
+    <option name="-setprop">cpa.predicate.refinement.predicateBasisStrategy=subgraph</option>
+    <option name="-setprop">cpa.lock.reduceLockCounters=BLOCK</option>
+    <option name="-setprop">cpa.lock.reduceUselessLocks=false</option>
+  </rundefinition>
+
+  <rundefinition name="all">
+    <option name="-lockator-linux-without-shared"/>
+    <option name="-setprop">cpa.predicate.refinement.predicateBasisStrategy=subgraph</option>
+    <option name="-setprop">cpa.lock.reduceLockCounters=ALL</option>
+    <option name="-setprop">cpa.lock.reduceUselessLocks=false</option>
+  </rundefinition>
+
+  <rundefinition name="useless">
+    <option name="-lockator-linux-without-shared"/>
+    <option name="-setprop">cpa.predicate.refinement.predicateBasisStrategy=subgraph</option>
+    <option name="-setprop">cpa.lock.reduceLockCounters=NONE</option>
+    <option name="-setprop">cpa.lock.reduceUselessLocks=true</option>
+  </rundefinition>
+
+  <rundefinition name="both">
+    <option name="-lockator-linux-without-shared"/>
+    <option name="-setprop">cpa.predicate.refinement.predicateBasisStrategy=subgraph</option>
+    <option name="-setprop">cpa.lock.reduceLockCounters=BLOCK</option>
+    <option name="-setprop">cpa.lock.reduceUselessLocks=true</option>
+  </rundefinition>
+</benchmark>

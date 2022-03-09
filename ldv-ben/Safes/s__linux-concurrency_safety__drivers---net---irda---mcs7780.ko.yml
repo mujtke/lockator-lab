@@ -1,0 +1,8 @@
+format_version: '1.0'
+
+input_files: 's__linux-concurrency_safety__drivers---net---irda---mcs7780.ko.cil.i'
+# Proved by CPALockator-TM, merge-join
+
+properties:
+  - property_file: ../data-race.prp
+    expected_verdict: true

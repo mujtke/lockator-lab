@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<!DOCTYPE benchmark PUBLIC "+//IDN sosy-lab.org//DTD BenchExec benchmark 1.0//EN" "http://www.sosy-lab.org/benchexec/benchmark-1.0.dtd">
+<benchmark tool="cpachecker" timelimit="900" hardtimelimit="1000" memlimit="12000 MB" cpuCores="2">
+  <!-- This file contains regression tests from the LDV project.
+       It expects the git repository git@bitbucket.org:dbeyer/ldv-benchmarks.git
+       to be checked out at test/programs/ldv-benchmarks. -->
+
+  <option name="-setprop">statistics.memory=true</option>
+  <option name="-heap">10000M</option>
+  <option name="-setprop">counterexample.export.exportWitness=false</option>
+  <option name="-setprop">cpa.arg.export=false</option>
+  <option name="-setprop">counterexample.export.exportAsSource=false</option>
+
+  <propertyfile>./data-race.prp</propertyfile>
+  
+  <tasks name="DeviceDrivers64">
+    <includesfile>Tasks.set</includesfile>
+  </tasks>
+
+  <rundefinition name="simple">
+    <option name="-lockator-threadmodular-linux"/>
+    <option name="-setprop">cpa.predicate.useUndefFunctions=false</option>
+    <option name="-setprop">cpa.predicate.joinEffectsIntoUndefs=false</option>
+    <option name="-setprop">cpa.predicate.refinement.predicateBasisStrategy=subgraph</option>
+    <option name="-setprop">cpa.predicate.applyRelevantEffects=true</option>
+    <option name="-setprop">cpa.thread.mode=SIMPLE</option>
+    <option name="-setprop">cpa.lock.refinement=false</option>    
+    <option name="-setprop">cpa.usage.refinement.refinementChain=IdentifierIterator,PointIterator,UsageIterator,SinglePathIterator,PredicateRefiner</option>
+  </rundefinition>
+
+  <rundefinition name="env">
+    <option name="-lockator-threadmodular-linux"/>
+    <option name="-setprop">cpa.predicate.useUndefFunctions=false</option>
+    <option name="-setprop">cpa.predicate.joinEffectsIntoUndefs=false</option>
+    <option name="-setprop">cpa.predicate.refinement.predicateBasisStrategy=subgraph</option>
+    <option name="-setprop">cpa.predicate.applyRelevantEffects=true</option>
+    <option name="-setprop">cpa.thread.mode=Environment</option>
+    <option name="-setprop">cpa.lock.refinement=false</option>    
+    <option name="-setprop">cpa.usage.refinement.refinementChain=IdentifierIterator,PointIterator,UsageIterator,SinglePathIterator,PredicateRefiner</option>
+  </rundefinition>
+
+  <rundefinition name="base">
+    <option name="-lockator-threadmodular-linux"/>
+    <option name="-setprop">cpa.predicate.useUndefFunctions=false</option>
+    <option name="-setprop">cpa.predicate.joinEffectsIntoUndefs=false</option>
+    <option name="-setprop">cpa.predicate.refinement.predicateBasisStrategy=subgraph</option>
+    <option name="-setprop">cpa.predicate.applyRelevantEffects=true</option>
+    <option name="-setprop">cpa.lock.refinement=false</option>    
+    <option name="-setprop">cpa.usage.refinement.refinementChain=IdentifierIterator,PointIterator,UsageIterator,SinglePathIterator,PredicateRefiner</option>
+  </rundefinition>
+
+</benchmark>
