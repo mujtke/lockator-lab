@@ -73,6 +73,7 @@ import org.sosy_lab.cpachecker.core.reachedset.ResultProviderReachedSet;
 import org.sosy_lab.cpachecker.core.specification.Specification;
 import org.sosy_lab.cpachecker.core.specification.SpecificationProperty;
 import org.sosy_lab.cpachecker.cpa.arg.ARGState;
+import org.sosy_lab.cpachecker.cpa.usage.UsageReachedSet;
 import org.sosy_lab.cpachecker.exceptions.CPAException;
 import org.sosy_lab.cpachecker.exceptions.ParserException;
 import org.sosy_lab.cpachecker.util.AbstractStates;
@@ -400,8 +401,11 @@ public class CPAchecker {
 
       if (status.wasPropertyChecked()) {
         stats.resultAnalysisTime.start();
-        if (reached.hasViolatedProperties()) {
-          violatedPropertyDescription = Joiner.on(", ").join(reached.getViolatedProperties());
+//        if (reached.hasViolatedProperties()) {
+//          violatedPropertyDescription = Joiner.on(", ").join(reached.getViolatedProperties());
+        // 这里修改一下获取违反的属性的方式
+          if (((UsageReachedSet)reached).haveUnsafes()) {
+            violatedPropertyDescription = Joiner.on(", ").join(((UsageReachedSet) reached).getUnsafesProperties());
 
           if (!status.isPrecise()) {
             result = Result.UNKNOWN;

@@ -274,6 +274,118 @@ public class IdentifierIterator extends WrappedConfigurableRefinementBlock<Reach
     }
   }
 
+  /**
+   * 改写细化方法，实际上只是利用细化过程来验证race的可行性
+   * @param pReached
+   * @return
+   * @throws CPAException
+   * @throws InterruptedException
+   */
+  public RefinementResult performRefinementForRaceVerification(ReachedSet pReached) throws CPAException, InterruptedException {
+
+    UsageReachedSet uReached;
+    if (pReached instanceof UsageReachedSet) {
+      uReached = (UsageReachedSet) pReached;
+    } else if (pReached instanceof ForwardingReachedSet) {
+      uReached = (UsageReachedSet) ((ForwardingReachedSet) pReached).getDelegate();
+    } else {
+      throw new UnsupportedOperationException("UsageRefiner requires UsageReachedSet");
+    }
+    UsageContainer container = uReached.getUsageContainer();
+    Set<SingleIdentifier> processedUnsafes = new HashSet<>();
+
+    logger.log(Level.INFO, ("Perform US refinement: " + i++));
+    int originUnsafeSize = container.getTotalUnsafeSize();
+    if (lastFalseUnsafeSize == -1) {
+      lastFalseUnsafeSize = originUnsafeSize;
+    }
+    int counter = lastFalseUnsafeSize - originUnsafeSize;
+    boolean raceIsReachable = false;  //用来标志race是否可行
+
+    sendUpdateSignal(PredicateRefinerAdapter.class, pReached);
+    sendUpdateSignal(PointIterator.class, container);
+
+    Iterator<SingleIdentifier> iterator = container.getUnrefinedUnsafeIterator(); // 返回的是unrefinedUnsafeIds的key集合
+    boolean isPrecisionChanged = false;
+    AbstractState firstState = pReached.getFirstState();
+    AdjustablePrecision finalPrecision = (AdjustablePrecision) pReached.getPrecision(firstState);
+    AdjustablePrecision initialPrecision =
+            (AdjustablePrecision) cpa.getInitialPrecision(
+                    AbstractStates.extractLocation(firstState),
+                    StateSpacePartition.getDefaultPartition());   // initialPrecision初始化为空
+
+    while (iterator.hasNext()) {    // 针对的是container中的Unsafe
+      SingleIdentifier currentId = iterator.next(); //unrefinedUnsafeIds中的id
+
+      stats.innerRefinementTimer.start();
+      RefinementResult result = wrappedRefiner.performBlockRefinement(currentId);   // 细化
+      /**
+       * 这里针对细化的结果可以将真反例打印出来
+       */
+      if (result.isTrue())
+        System.out.println("race:"+result.getTrueRace().getFirst().getCFANode()+result.getTrueRace().getSecond().getCFANode());
+
+      stats.innerRefinementTimer.stop();
+
+      Collection<AdjustablePrecision> info = result.getPrecisions();    // 从反例中得到的新精度(谓词)
+
+      if (!info.isEmpty()) {    //获取的新精度不为空
+        stats.precisionTimer.start();
+        AdjustablePrecision updatedPrecision =
+                precisionMap.getOrDefault(currentId, initialPrecision);   // 如果currentId原本就有精度，则返回原来的精度，否则将其精度设置为initialPrecision
+
+        for (AdjustablePrecision p : info) {
+          updatedPrecision = updatedPrecision.add(p); // 添加新发现的精度
+        }
+
+        assert !updatedPrecision.isEmpty() : "Updated precision is expected to be not empty";
+        precisionMap.put(currentId, updatedPrecision);
+        finalPrecision = finalPrecision.add(updatedPrecision);
+        isPrecisionChanged = true;
+        stats.precisionTimer.stop();
+      }
+
+      if (result.isTrue()) {    // 如果race可行
+        raceIsReachable = true;
+        container.setAsRefined(currentId, result); // 将currentId对应的条目从unrefinedIds中移除，添加到refinedIds中，同时将该Id对应及其对应的访问对放入stableUnsafes中
+        processedUnsafes.add(currentId);    // 添加到processedUnsafes中的id要么是形成真实race的id，要么是选择进行忽略的id
+      } else if (hideFilteredUnsafes && result.isFalse() && !isPrecisionChanged) {  // 如果设置了hideFilteredUnsafe为true，默认设置为false
+        //We do not add a precision, but consider the unsafe as false               // 对于假的race，可能存在不产生新精度的情况，此时通过设置hideFilteredUnsafes来隐藏
+        //set it as false now, because it will occur again, as precision is not changed
+        //We can not look at precision size here - the result can be false due to heuristics
+        container.setAsFalseUnsafe(currentId);    // 将对应的id放到falseUnsafe中，同时将该id从unrefinedIds中移除
+        processedUnsafes.add(currentId);
+      }
+    }
+    int newTrueUnsafeSize = container.getProcessedUnsafeSize();
+    counter += (newTrueUnsafeSize - lastTrueUnsafes);
+    if (counter >= precisionReset) {    // precisionReset = 2^31 - 1，所以？ 重置？
+      Precision p = pReached.getPrecision(pReached.getFirstState());
+      pReached.updatePrecision(pReached.getFirstState(),
+              Precisions.replaceByType(p, PredicatePrecision.empty(), Predicates.instanceOf(PredicatePrecision.class)));
+
+      //TODO will we need other finish signal?
+      //wrappedRefiner.finish(getClass());
+      lastFalseUnsafeSize = originUnsafeSize;
+      lastTrueUnsafes = newTrueUnsafeSize;
+    }
+    if (!raceIsReachable) {    // 如果没有可行的race
+      // 继续探索
+    }
+    logger.log(Level.INFO, container.getUnsafeStatus());
+    //pStat.UnsafeCheck.stopIfRunning();
+    if (!raceIsReachable) {
+      return RefinementResult.createTrue();
+    } else {
+      return RefinementResult.createFalse();
+    }
+  }
+
+  //检查race是否是不可行的
+  public boolean performCheck(ReachedSet pReached) throws CPAException, InterruptedException {
+    return performRefinementForRaceVerification(pReached).isTrue();
+  }
+
   @Override
   public void printStatistics(StatisticsWriter pOut) {
     wrappedRefiner.printStatistics(pOut);

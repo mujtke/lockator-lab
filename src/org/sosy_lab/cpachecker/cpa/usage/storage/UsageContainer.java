@@ -37,6 +37,7 @@ import org.sosy_lab.cpachecker.util.statistics.StatisticsWriter;
 public class UsageContainer {
   private final NavigableMap<SingleIdentifier, UnrefinedUsagePointSet> unrefinedIds;
   private final NavigableMap<SingleIdentifier, RefinedUsagePointSet> refinedIds;
+  private final NavigableMap<SingleIdentifier, UnrefinedUsagePointSet> haveUnsafesIds;
 
   private Map<SingleIdentifier, Pair<UsageInfo, UsageInfo>> stableUnsafes = new TreeMap<>();
 
@@ -63,6 +64,7 @@ public class UsageContainer {
   public UsageContainer(UsageConfiguration pConfig, LogManager l) {
     unrefinedIds = new ConcurrentSkipListMap<>();
     refinedIds = new TreeMap<>();
+    haveUnsafesIds = new TreeMap<>();
     falseUnsafes = new TreeSet<>();
     logger = l;
     detector = new UnsafeDetector(pConfig);
@@ -108,38 +110,70 @@ public class UsageContainer {
     // addingToSetTimer.stop();
   }
 
+//  private void calculateUnsafesIfNecessary() {
+//    if (!usagesCalculated) {
+//      unsafeDetectionTimer.start();
+//      usagesCalculated = true;
+//
+//      Iterator<Entry<SingleIdentifier, UnrefinedUsagePointSet>> iterator =
+//          unrefinedIds.entrySet().iterator();
+//      while (iterator.hasNext()) {
+//        Entry<SingleIdentifier, UnrefinedUsagePointSet> entry = iterator.next();
+//        UnrefinedUsagePointSet tmpList = entry.getValue();    //包含对特定id的topUsage和UsageInfoSets
+//        if (detector.isUnsafe(tmpList)) {
+//          if (!oneTotalIteration) {
+//            initialUsages += tmpList.size();
+//          }
+//        } else {
+//          if (!oneTotalIteration) {
+//            sharedVariables.inc();
+//          }
+//          iterator.remove();    //如果没有构成Unsafe，则将unrefinedIds中对应的条目删除
+//        }
+//      }
+//      //到这里，unrefinedIds中的条目数量会减少很多，应该是那些不存在Unsafe的被删除了
+//      if (!oneTotalIteration) {
+//        initialUnsafes = new TreeSet<>(unrefinedIds.keySet());   //跟oneTotalIteration的取值有关，会在其取值为false时将unrefinedIds中存在着Unsafe情况的所有条目复制到initialUnsafes中
+//      } else {
+//        falseUnsafes = new TreeSet<>(initialUnsafes);     // 首次执行到此时，initialUnsafe中包含了unrefinedIds中存在Unsafe所有的id，之后经过下面两步逐渐筛检存在falseUnsafe的id
+//        falseUnsafes.removeAll(unrefinedIds.keySet());    // 此时falseUnsafe中剩下的就是真正的falseUnsafe（如果是falseUnsafe，则经过之前的细化后，相应的unrefinedId从haveUnsafe变成了不在含有Unsafe，因此相应的unrefinedIds中的项被删除）
+//        falseUnsafes.removeAll(refinedIds.keySet());      // 放到refinedIds中的id不用再管
+//      }
+//
+//      unsafeDetectionTimer.stop();
+//    }
+//  }
+
+  // 每次都要提取相应的信息
   private void calculateUnsafesIfNecessary() {
-    if (!usagesCalculated) {
-      unsafeDetectionTimer.start();
-      usagesCalculated = true;
+    unsafeDetectionTimer.start();
 
-      Iterator<Entry<SingleIdentifier, UnrefinedUsagePointSet>> iterator =
-          unrefinedIds.entrySet().iterator();
-      while (iterator.hasNext()) {
-        Entry<SingleIdentifier, UnrefinedUsagePointSet> entry = iterator.next();
-        UnrefinedUsagePointSet tmpList = entry.getValue();    //包含对特定id的topUsage和UsageInfoSets
-        if (detector.isUnsafe(tmpList)) {
-          if (!oneTotalIteration) {
-            initialUsages += tmpList.size();
-          }
-        } else {
-          if (!oneTotalIteration) {
-            sharedVariables.inc();
-          }
-          iterator.remove();    //如果没有构成Unsafe，则将unrefinedIds中对应的条目删除
+    Iterator<Entry<SingleIdentifier, UnrefinedUsagePointSet>> iterator =
+            unrefinedIds.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Entry<SingleIdentifier, UnrefinedUsagePointSet> entry = iterator.next();
+      UnrefinedUsagePointSet tmpList = entry.getValue();    //包含对特定id的topUsage和UsageInfoSets
+      if (detector.isUnsafe(tmpList)) {
+        if (!oneTotalIteration) {
+          initialUsages += tmpList.size();
         }
-      }
-      //到这里，unrefinedIds中的条目数量会减少很多，应该是那些不存在Unsafe的被删除了
-      if (!oneTotalIteration) {
-        initialUnsafes = new TreeSet<>(unrefinedIds.keySet());   //跟oneTotalIteration的取值有关，会在其取值为false时将unrefinedIds中存在着Unsafe情况的所有条目复制到initialUnsafes中
       } else {
-        falseUnsafes = new TreeSet<>(initialUnsafes);     // 首次执行到此时，initialUnsafe中包含了unrefinedIds中存在Unsafe所有的id，之后经过下面两步逐渐筛检存在falseUnsafe的id
-        falseUnsafes.removeAll(unrefinedIds.keySet());    // 此时falseUnsafe中剩下的就是真正的falseUnsafe（如果是falseUnsafe，则经过之前的细化后，相应的unrefinedId从haveUnsafe变成了不在含有Unsafe，因此相应的unrefinedIds中的项被删除）
-        falseUnsafes.removeAll(refinedIds.keySet());      // 放到refinedIds中的id不用再管
+        if (!oneTotalIteration) {
+          sharedVariables.inc();
+        }
+        iterator.remove();    //如果没有构成Unsafe，则将unrefinedIds中对应的条目删除
       }
-
-      unsafeDetectionTimer.stop();
     }
+    //到这里，unrefinedIds中的条目数量会减少很多，应该是那些不存在Unsafe的被删除了
+    if (!oneTotalIteration) {
+      initialUnsafes = new TreeSet<>(unrefinedIds.keySet());   //跟oneTotalIteration的取值有关，会在其取值为false时将unrefinedIds中存在着Unsafe情况的所有条目复制到initialUnsafes中
+    } else {
+      falseUnsafes = new TreeSet<>(initialUnsafes);     // 首次执行到此时，initialUnsafe中包含了unrefinedIds中存在Unsafe所有的id，之后经过下面两步逐渐筛检存在falseUnsafe的id
+      falseUnsafes.removeAll(unrefinedIds.keySet());    // 此时falseUnsafe中剩下的就是真正的falseUnsafe（如果是falseUnsafe，则经过之前的细化后，相应的unrefinedId从haveUnsafe变成了不在含有Unsafe，因此相应的unrefinedIds中的项被删除）
+      falseUnsafes.removeAll(refinedIds.keySet());      // 放到refinedIds中的id不用再管
+    }
+
+    unsafeDetectionTimer.stop();
   }
 
   public Set<SingleIdentifier> getFalseUnsafes() {
@@ -311,5 +345,43 @@ public class UsageContainer {
 
   public Map<SingleIdentifier, Pair<UsageInfo, UsageInfo>> getStableUnsafes() {
     return stableUnsafes;
+  }
+
+  /**
+   * 改写hasUnsafes()之后的调用逻辑
+   */
+  public boolean hasUnsafesForUsageContainer() {
+    findUnsafesIfExist();
+    stableUnsafes.clear();
+//    addUnsafesFrom(refinedIds);
+    addUnsafesFrom(haveUnsafesIds);    // 将存在存在Unsafes的ids放到stableUnsafes中
+
+    return !stableUnsafes.isEmpty();
+  }
+
+  private void findUnsafesIfExist() {
+    unsafeDetectionTimer.start();
+
+    Iterator<Entry<SingleIdentifier, UnrefinedUsagePointSet>> iterator =
+            unrefinedIds.entrySet().iterator();             //
+//    falseUnsafes = new TreeSet<>(unrefinedIds.keySet());    //先假设所有的id都为不安全
+    while (iterator.hasNext()) {
+      Entry<SingleIdentifier, UnrefinedUsagePointSet> entry = iterator.next();
+      UnrefinedUsagePointSet tmpList = entry.getValue();    //包含对特定id的topUsage和UsageInfoSets
+      if (detector.isUnsafe(tmpList)) {                     //若对某个id计算出存在不安全
+        if (!oneTotalIteration) {
+          initialUsages += tmpList.size();
+        }
+//        falseUnsafes.remove(entry.getKey());                //则将对应的id从falseUnsafes中移除
+        haveUnsafesIds.put(entry.getKey(), entry.getValue()); //将该id添加到haveUnsafesIds中
+      } else {                                              //对当前id的计算没有发现不安全
+        if (!oneTotalIteration) {
+          sharedVariables.inc();
+        }
+        //iterator.remove();
+      }
+    }
+
+    unsafeDetectionTimer.stop();
   }
 }

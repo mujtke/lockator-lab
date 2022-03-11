@@ -48,6 +48,7 @@ import org.sosy_lab.cpachecker.core.reachedset.UnmodifiableReachedSet;
 import org.sosy_lab.cpachecker.cpa.arg.ARGMergeJoinCPAEnabledAnalysis;
 import org.sosy_lab.cpachecker.cpa.arg.ARGState;
 import org.sosy_lab.cpachecker.cpa.location.LocationState;
+import org.sosy_lab.cpachecker.cpa.usage.UsageReachedSet;
 import org.sosy_lab.cpachecker.exceptions.CPAException;
 import org.sosy_lab.cpachecker.util.AbstractStates;
 import org.sosy_lab.cpachecker.util.Pair;
@@ -256,8 +257,49 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
     }
   }
 
+//  private AlgorithmStatus run0(final ReachedSet reachedSet) throws CPAException, InterruptedException {
+//    while (reachedSet.hasWaitingState()) {
+//      shutdownNotifier.shutdownIfNecessary();
+//
+//      stats.countIterations++;
+//
+//      // Pick next state using strategy
+//      // BFS, DFS or top sort according to the configuration
+//      int size = reachedSet.getWaitlist().size();
+//      if (size >= stats.maxWaitlistSize) {
+//        stats.maxWaitlistSize = size;
+//      }
+//      stats.countWaitlistSize += size;
+//
+//      stats.chooseTimer.start();
+//      final AbstractState state = reachedSet.popFromWaitlist();     //取出的状态
+//      final Precision precision = reachedSet.getPrecision(state);   //取出的状态对应的精度
+//      stats.chooseTimer.stop();
+//
+//      logger.log(Level.FINER, "Retrieved state from waitlist");
+//      try {
+//        if (handleState(state, precision, reachedSet)) {
+//          // Prec operator requested break
+//          return status;
+//        }
+//      } catch (Exception e) {
+//        // re-add the old state to the waitlist, there might be unhandled successors left
+//        // that otherwise would be forgotten (which would be unsound)
+//        reachedSet.reAddToWaitlist(state);
+//        throw e;
+//      }
+//
+//    }
+//
+//    return status;
+//  }
+
+  /**
+   * 不再一直探索，每探索一个状态的后继之后，就退出进行下一轮
+   * while -> if
+   */
   private AlgorithmStatus run0(final ReachedSet reachedSet) throws CPAException, InterruptedException {
-    while (reachedSet.hasWaitingState()) {
+    if (reachedSet.hasWaitingState()) {
       shutdownNotifier.shutdownIfNecessary();
 
       stats.countIterations++;
@@ -462,6 +504,10 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
 
         stats.addTimer.start();
         reachedSet.add(successor, successorPrecision);    //reached = reached U {(e_hat, π_hat)}
+
+        // 将对应的后继添加到newSuccessorsInEachIteration中
+        ((UsageReachedSet) reachedSet).newSuccessorsInEachIteration.put(successor, successorPrecision);
+
         stats.addTimer.stop();
       }
     }

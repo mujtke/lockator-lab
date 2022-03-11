@@ -11,8 +11,8 @@ package org.sosy_lab.cpachecker.cpa.usage;
 import com.google.common.collect.ImmutableSet;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.ObjectOutputStream;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+
 import org.sosy_lab.common.log.LogManager;
 import org.sosy_lab.cpachecker.core.interfaces.AbstractState;
 import org.sosy_lab.cpachecker.core.interfaces.ConfigurableProgramAnalysis;
@@ -20,11 +20,13 @@ import org.sosy_lab.cpachecker.core.interfaces.Precision;
 import org.sosy_lab.cpachecker.core.interfaces.Property;
 import org.sosy_lab.cpachecker.core.reachedset.PartitionedReachedSet;
 import org.sosy_lab.cpachecker.core.waitlist.Waitlist.WaitlistFactory;
+import org.sosy_lab.cpachecker.cpa.arg.ARGState;
 import org.sosy_lab.cpachecker.cpa.bam.BAMCPA;
 import org.sosy_lab.cpachecker.cpa.bam.cache.BAMDataManager;
 import org.sosy_lab.cpachecker.cpa.usage.storage.ConcurrentUsageExtractor;
 import org.sosy_lab.cpachecker.cpa.usage.storage.UsageConfiguration;
 import org.sosy_lab.cpachecker.cpa.usage.storage.UsageContainer;
+import org.sosy_lab.cpachecker.cpa.usage.storage.UsageExtractor;
 import org.sosy_lab.cpachecker.util.CPAs;
 import org.sosy_lab.cpachecker.util.Pair;
 import org.sosy_lab.cpachecker.util.identifiers.SingleIdentifier;
@@ -36,6 +38,7 @@ public class UsageReachedSet extends PartitionedReachedSet {
   private static final long serialVersionUID = 1L;
 
   private boolean usagesExtracted = false;
+  private boolean haveUnsafes = false;
 
   public static class RaceProperty implements Property {
     @Override
@@ -49,8 +52,12 @@ public class UsageReachedSet extends PartitionedReachedSet {
   private final LogManager logger;
   private final UsageConfiguration usageConfig;
   private ConcurrentUsageExtractor extractor = null;
+  private UsageExtractor serialExtractor = null;
 
   private final UsageContainer container;
+
+  // 用来存储每次迭代新产生的后继
+  public LinkedHashMap<AbstractState, Precision> newSuccessorsInEachIteration;
 
   public UsageReachedSet(
       WaitlistFactory waitlistFactory, UsageConfiguration pConfig, LogManager pLogger) {
@@ -58,6 +65,7 @@ public class UsageReachedSet extends PartitionedReachedSet {
     logger = pLogger;
     container = new UsageContainer(pConfig, logger);
     usageConfig = pConfig;
+    newSuccessorsInEachIteration = new LinkedHashMap<>();
   }
 
   @Override
@@ -91,6 +99,37 @@ public class UsageReachedSet extends PartitionedReachedSet {
     return container.hasUnsafes();    // 有问题：container属于reachedSet，这里的container中的usages对应于那些dump的usages
   }                                   // container与extractor中的container相同，在concurrentUsageExtractor中添加container的项
 
+  /**
+   * 仿照hasViolatedProperties进行改写
+   * @return 是否有race可能存在
+   */
+  // 检查每轮得到的后继是否导致了不安全
+  // 重写extractUsages方法
+  public boolean haveUnsafeInNewSucs() {
+    serialExtractor.extractUsages(newSuccessorsInEachIteration);
+    if (serialExtractor.haveUsagesExtracted) {
+      serialExtractor.haveUsagesExtracted = false;
+      return container.hasUnsafesForUsageContainer();
+    }
+    return false;
+  }
+
+  public void setHaveUnsafes(boolean value) {
+    this.haveUnsafes = value;
+  }
+
+  public boolean haveUnsafes() {
+    return this.haveUnsafes;
+  }
+
+  public Set<Property> getUnsafesProperties() {
+    if (haveUnsafes) {
+      return RACE_PROPERTY;
+    } else {
+      return ImmutableSet.of();
+    }
+  }
+
   @Override
   public Set<Property> getViolatedProperties() {
     if (hasViolatedProperties()) {
@@ -119,11 +158,15 @@ public class UsageReachedSet extends PartitionedReachedSet {
       UsageCPA uCpa = CPAs.retrieveCPA(pCpa, UsageCPA.class);
       uCpa.getStats().setBAMCPA(bamCPA);
     }
-    extractor = new ConcurrentUsageExtractor(pCpa, logger, container, usageConfig);
+    serialExtractor = new UsageExtractor(pCpa, logger, container, usageConfig);
   }
 
+//  public void printStatistics(StatisticsWriter pWriter) {
+//    extractor.printStatistics(pWriter);
+//  }
+
   public void printStatistics(StatisticsWriter pWriter) {
-    extractor.printStatistics(pWriter);
+    serialExtractor.printStatistics(pWriter);
   }
 
   public BAMDataManager getBAMDataManager() {
@@ -131,3 +174,5 @@ public class UsageReachedSet extends PartitionedReachedSet {
   }
 
 }
+
+

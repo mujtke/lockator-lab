@@ -113,6 +113,11 @@ public class UsageProcessor {
     redundantIds = set;
   }
 
+  /**
+   * 如果在每次计算后继边立即提取usage，那么下面利用child节点来获取usage的方法将失效，因为此时还没有获取到child节点
+   * @param pState
+   * @return
+   */
   @SuppressWarnings("SynchronizeOnNonFinalField")
   public List<UsageInfo> getUsagesForState(AbstractState pState) {
 
@@ -162,6 +167,84 @@ public class UsageProcessor {
           // searchingCacheTimer.stop();
           if (!redundantIds.contains(id)) {         // 如果id不是冗余的，冗余是指不重复？
             createUsages(id, node, child, pair.getSecond(), result);    // 将相应的Usage放入result中
+          }
+        }
+        // usagePreparationTimer.stop();
+
+      } else {
+        // No edge, for example, due to BAM
+        // Note, function call edge was already handled, we do not miss it
+      }
+    }
+
+    if (resultComputed && result.isEmpty()) {
+      synchronized (uselessNodes) {
+        uselessNodes.add(node);         // 如果已经结算过但是result依然为空，将该State放入uselessNodes中
+      }
+      synchronized (usages) {
+        for (int i = 0; i < node.getNumLeavingEdges(); i++) {
+          CFAEdge e = node.getLeavingEdge(i);
+          usages.remove(e);             // 同时将从该State出发的边对应的usage从Usages中移除
+        }
+      }
+    }
+    // totalTimer.stop();
+    return result;
+  }
+
+  /**
+   * 利用当前节点与父亲节点之间的边来获取Usages
+   * @param pState
+   * @return
+   */
+  public List<UsageInfo> getUsagesForStateByParentState(AbstractState pState) {
+
+    // Not a set, as usage.equals do not consider id
+    List<UsageInfo> result;
+    // totalTimer.start();
+    result = new ArrayList<>();
+
+    ARGState argState = (ARGState) pState;
+    CFANode node = AbstractStates.extractLocation(argState);
+
+    synchronized (uselessNodes) {
+      if (uselessNodes.contains(node)) {  // 如果pState属于uselessNodes，则获取Usage的结果为空
+        // totalTimer.stop();
+        return result;
+      }
+    }
+    boolean resultComputed = false;
+
+    for (ARGState parent : argState.getParents()) {   // 获取Usage需要用到边，因此需要先获取子节点，但是子节点中并不是所有的节点都是通过CFA边与pState相连接的，例如已经通过BAM处理
+      CFANode parentNode = AbstractStates.extractLocation(parent);
+
+      if (parentNode.hasEdgeTo(node)) {    // 如果有CFA边连接（经过BAM处理的不用再处理）
+        // Need the flag to avoid missed cases with applied edges: it may be traversed first,
+        // so put to useless nodes ONLY if there is a normal CFA edge. 只有那些存在正常的CAF边的节点才会被放到uselessNode中
+        resultComputed = true;
+        CFAEdge edge = parentNode.getEdgeTo(node);
+        Collection<Pair<AbstractIdentifier, Access>> ids;
+
+        synchronized (usages) {
+          if (usages.containsKey(edge)) {     // 如果这条边已经在usages中了，则从usages中获取相应的<id, Access>对
+            ids = usages.get(edge);
+          } else {                            // 如果这条边不在usages中，则进行新的计算
+            ids = getUsagesForEdge(argState, edge);  // child为当前状态的子状态，edge为两者之间所连的边
+            if (!ids.isEmpty()) {
+              usages.put(edge, ids);          // 如果计算结果不为空，则将结果放入usages中
+            }
+          }
+        }
+
+        // usagePreparationTimer.start();
+        for (Pair<AbstractIdentifier, Access> pair : ids) {
+          AbstractIdentifier id = pair.getFirst();
+          // Links will be extracted as aliases later
+
+          // searchingCacheTimer.start();
+          // searchingCacheTimer.stop();
+          if (!redundantIds.contains(id)) {         // 如果id不是冗余的，冗余是指不重复？
+            createUsages(id, node, argState, pair.getSecond(), result);    // 将相应的Usage放入result中
           }
         }
         // usagePreparationTimer.stop();

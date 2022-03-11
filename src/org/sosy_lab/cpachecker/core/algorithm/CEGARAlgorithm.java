@@ -41,6 +41,8 @@ import org.sosy_lab.cpachecker.core.interfaces.Statistics;
 import org.sosy_lab.cpachecker.core.interfaces.StatisticsProvider;
 import org.sosy_lab.cpachecker.core.reachedset.ReachedSet;
 import org.sosy_lab.cpachecker.core.reachedset.UnmodifiableReachedSet;
+import org.sosy_lab.cpachecker.cpa.usage.UsageReachedSet;
+import org.sosy_lab.cpachecker.cpa.usage.refinement.IdentifierIterator;
 import org.sosy_lab.cpachecker.cpa.value.refiner.UnsoundRefiner;
 import org.sosy_lab.cpachecker.exceptions.CPAException;
 import org.sosy_lab.cpachecker.exceptions.RefinementFailedException;
@@ -215,6 +217,70 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
     new CEGARMBean().register();
   }
 
+//  @Override
+//  public AlgorithmStatus run(ReachedSet reached) throws CPAException, InterruptedException {
+//    AlgorithmStatus status = AlgorithmStatus.SOUND_AND_PRECISE;
+//
+//    boolean refinedInPreviousIteration = false;
+//    stats.totalTimer.start();
+//    try {
+//      boolean refinementSuccessful;
+//      int dotFileIndex = 0;
+//      do {
+//        refinementSuccessful = false;   // 如果上一次细化成功，则reached会变成只有初始状态，并伴随有新的精度
+//        final AbstractState previousLastState = reached.getLastState();
+//
+//        // run algorithm
+//        status = status.update(algorithm.run(reached));     // 根据新的精度，从头开始重新计算reached
+//
+////        {/**
+////         * 将reachedSet导出成ARG
+////         */
+////          exportARG(reached, "./output/reachedARG/reachedARG_" + (dotFileIndex++) + "_.dot");
+////        }
+//        notifyReachedSetUpdateListeners(reached);
+//
+//        if (stats.countRefinements == maxRefinementNum) {
+//          logger.log(Level.WARNING, "Aborting analysis because maximum number of refinements " + maxRefinementNum + " used");
+//          status = status.withPrecise(false);
+//          break;
+//        }
+//
+//        // if there is any target state do refinement
+//        if (refinementNecessary(reached, previousLastState)) {
+//          refinementSuccessful = refine(reached);   // 如果refinementSuccessful为true则会进行下一次细化
+//          refinedInPreviousIteration = true;
+//          // Note, with special options reached set still contains violated properties
+//          // i.e (stopAfterError = true) or race conditions analysis
+//        }
+//
+//        // restart exploration for unsound refiners, as due to unsound refinement
+//        // a sound over-approximation has to be found for proving safety
+//        else if (mRefiner instanceof UnsoundRefiner) {
+//          if (!refinedInPreviousIteration) {
+//            break;
+//          }
+//
+//          ((UnsoundRefiner)mRefiner).forceRestart(reached);
+//          refinementSuccessful        = true;
+//          refinedInPreviousIteration  = false;
+//        }
+//
+//      } while (refinementSuccessful);
+//
+//    } finally {
+//      stats.totalTimer.stop();
+//    }
+//    return status;
+//  }
+
+  /**
+   * 重新修改逻辑
+   * @param reached
+   * @return
+   * @throws CPAException
+   * @throws InterruptedException
+   */
   @Override
   public AlgorithmStatus run(ReachedSet reached) throws CPAException, InterruptedException {
     AlgorithmStatus status = AlgorithmStatus.SOUND_AND_PRECISE;
@@ -222,20 +288,20 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
     boolean refinedInPreviousIteration = false;
     stats.totalTimer.start();
     try {
-      boolean refinementSuccessful;
-      int dotFileIndex = 0;
+      boolean raceFound;    // 是否发现了race
       do {
-        refinementSuccessful = false;   // 如果上一次细化成功，则reached会变成只有初始状态，并伴随有新的精度
+        raceFound = false;
         final AbstractState previousLastState = reached.getLastState();
 
         // run algorithm
-        status = status.update(algorithm.run(reached));     // 根据新的精度，从头开始重新计算reached
-
-        {/**
-         * 将reachedSet导出成ARG
-         */
-          exportARG(reached, "./output/reachedARG/reachedARG_" + (dotFileIndex++) + "_.dot");
+        status = status.update(algorithm.run(reached));     // 更新可达集，不会探索完全，每轮探索一个状态的后继
+        if (((UsageReachedSet)reached).newSuccessorsInEachIteration.isEmpty()) {
+          if (reached.hasWaitingState()) {
+            continue;
+          }
+          break;
         }
+
         notifyReachedSetUpdateListeners(reached);
 
         if (stats.countRefinements == maxRefinementNum) {
@@ -244,14 +310,17 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
           break;
         }
 
-        // if there is any target state do refinement
-        if (refinementNecessary(reached, previousLastState)) {
-          refinementSuccessful = refine(reached);   // 如果refinementSuccessful为true则会进行下一次细化
+        // 如果可能存在Unsafes
+        if (haveUnsafeOrNot(reached) == true) {
+          raceFound = !checkRace(reached);   // 检查路径是否可行，如果为假反例则返回false，真反例返回true，即raceFound
+          if (raceFound) {
+            ((UsageReachedSet) reached).setHaveUnsafes(true);
+            break;
+          }
           refinedInPreviousIteration = true;
           // Note, with special options reached set still contains violated properties
           // i.e (stopAfterError = true) or race conditions analysis
         }
-
         // restart exploration for unsound refiners, as due to unsound refinement
         // a sound over-approximation has to be found for proving safety
         else if (mRefiner instanceof UnsoundRefiner) {
@@ -260,11 +329,17 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
           }
 
           ((UnsoundRefiner)mRefiner).forceRestart(reached);
-          refinementSuccessful        = true;
+          raceFound        = true;
           refinedInPreviousIteration  = false;
         }
+        if (!reached.hasWaitingState()) {
+          break;
+        }
 
-      } while (refinementSuccessful);
+        // 在下一次计算后继时，清空上一次计算得到的后继
+        ((UsageReachedSet)reached).newSuccessorsInEachIteration.clear();
+
+      } while (!raceFound);
 
     } finally {
       stats.totalTimer.stop();
@@ -286,6 +361,12 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
     }
   }
 
+  private boolean haveUnsafeOrNot(ReachedSet reached) {
+    if (((UsageReachedSet) reached).newSuccessorsInEachIteration.isEmpty())
+      return false;
+    return ((UsageReachedSet)reached).haveUnsafeInNewSucs();
+  }
+
   @SuppressWarnings("NonAtomicVolatileUpdate") // statistics written only by one thread
   @SuppressFBWarnings(
       value = "VO_VOLATILE_INCREMENT",
@@ -301,6 +382,43 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
     boolean refinementResult;
     try {
       refinementResult = mRefiner.performRefinement(reached);
+
+    } catch (RefinementFailedException e) {
+      stats.countFailedRefinements++;
+      throw e;
+    } finally {
+      stats.refinementTimer.stop();
+    }
+
+    logger.log(Level.FINE, "Refinement successful:", refinementResult);
+
+    if (refinementResult) {
+      stats.countSuccessfulRefinements++;
+      stats.totalReachedSizeAfterRefinement += reached.size();
+      stats.maxReachedSizeAfterRefinement = Math.max(stats.maxReachedSizeAfterRefinement, reached.size());
+    }
+
+    return refinementResult;
+  }
+
+  /**
+   * 改写refine方法，用于判断race的可行性
+   * @param reached
+   * @return
+   * @throws CPAException
+   * @throws InterruptedException
+   */
+  private boolean checkRace(ReachedSet reached) throws CPAException, InterruptedException {
+    logger.log(Level.FINE, "Error found, performing check");
+    stats.countRefinements++;
+    stats.totalReachedSizeBeforeRefinement += reached.size();
+    stats.maxReachedSizeBeforeRefinement = Math.max(stats.maxReachedSizeBeforeRefinement, reached.size());
+    sizeOfReachedSetBeforeRefinement = reached.size();
+
+    stats.refinementTimer.start();
+    boolean refinementResult;
+    try {
+      refinementResult = ((IdentifierIterator)mRefiner).performCheck(reached);
 
     } catch (RefinementFailedException e) {
       stats.countFailedRefinements++;
@@ -352,5 +470,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
       rsul.updated(pReachedSet);
     }
   }
+
+
 
 }
