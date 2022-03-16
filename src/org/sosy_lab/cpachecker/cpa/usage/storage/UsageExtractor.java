@@ -99,7 +99,7 @@ public class UsageExtractor {
     @SuppressWarnings("FutureReturnValueIgnored")
     public void extractUsages(LinkedHashMap<AbstractState, Precision> newSucsInEachIteration) {
         totalTimer.start();
-        logger.log(Level.INFO, "one iteration is over, start usage extraction");
+//        logger.log(Level.INFO, "one iteration is over, start usage extraction");
         Multimap<AbstractState, UsageDelta> processedSets = ArrayListMultimap.create();
 
         Set<Map.Entry<AbstractState, Precision>> entrySet = newSucsInEachIteration.entrySet();    //取出第一个状态
@@ -139,7 +139,7 @@ public class UsageExtractor {
                 stateWaitlist.add(it.next().getKey());     // 将newSucsInEachIteratiron中的下一个状态放到waitlist中
         }
 
-        logger.log(Level.INFO, "one Usage extraction is finished");
+//        logger.log(Level.INFO, "one Usage extraction is finished");
         totalTimer.stop();
     }
 

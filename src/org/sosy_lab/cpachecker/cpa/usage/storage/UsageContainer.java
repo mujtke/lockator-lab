@@ -348,6 +348,7 @@ public class UsageContainer {
    * 改写hasUnsafes()之后的调用逻辑
    */
   public boolean hasUnsafesForUsageContainer() {
+    haveUnsafesIds.clear();     //防止空指针异常
     findUnsafesIfExist();
     stableUnsafes.clear();
 //    addUnsafesFrom(refinedIds);

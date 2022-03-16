@@ -323,8 +323,10 @@ public class IdentifierIterator extends WrappedConfigurableRefinementBlock<Reach
       /**
        * 这里针对细化的结果可以将真反例打印出来
        */
-      if (result.isTrue())
-        System.out.println("race:"+result.getTrueRace().getFirst().getCFANode()+" && "+result.getTrueRace().getSecond().getCFANode());
+      if (result.isTrue()) {
+        System.out.println("race:" + result.getTrueRace().getFirst().getCFANode() + " && " + result.getTrueRace().getSecond().getCFANode());
+        System.out.println(result.getTrueRace());
+      }
 
       stats.innerRefinementTimer.stop();
 

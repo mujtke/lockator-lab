@@ -96,8 +96,8 @@ public class PredicateRefinerAdapter extends GenericSinglePathRefiner {
       if (!affectedStates.isEmpty()) {
         // it may be, if there are no valuable interpolants: ..., true, false, ...
         result.addInfo(PredicateRefinerAdapter.class, affectedStates);
-        PredicatePrecision lastPrecision = strategy.getNewPrecision();
-//        PredicatePrecision lastPrecision = strategy.getNewPrecisionGlobal();    // 测试全局谓词
+//        PredicatePrecision lastPrecision = strategy.getNewPrecision();
+        PredicatePrecision lastPrecision = strategy.getNewPrecisionGlobal();    // 测试全局谓词
         assert (lastPrecision != null);
         assert (!lastPrecision.isEmpty());
         result.addPrecision(lastPrecision);
