@@ -9,16 +9,17 @@
 package org.sosy_lab.cpachecker.core.algorithm;
 
 import static com.google.common.base.Verify.verifyNotNull;
+import static com.google.common.collect.FluentIterable.from;
 import static my_lab.GlobalMethods.exportARG;
 import static org.sosy_lab.cpachecker.util.AbstractStates.isTargetState;
 import static org.sosy_lab.cpachecker.util.statistics.StatisticsUtils.div;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
+import com.google.common.collect.Sets;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.PrintStream;
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -31,21 +32,24 @@ import org.sosy_lab.common.configuration.Option;
 import org.sosy_lab.common.configuration.Options;
 import org.sosy_lab.common.log.LogManager;
 import org.sosy_lab.common.time.Timer;
+import org.sosy_lab.cpachecker.cfa.model.CFANode;
 import org.sosy_lab.cpachecker.core.CPAcheckerResult.Result;
 import org.sosy_lab.cpachecker.core.algorithm.ParallelAlgorithm.ReachedSetUpdateListener;
 import org.sosy_lab.cpachecker.core.algorithm.ParallelAlgorithm.ReachedSetUpdater;
-import org.sosy_lab.cpachecker.core.interfaces.AbstractState;
-import org.sosy_lab.cpachecker.core.interfaces.ConfigurableProgramAnalysis;
-import org.sosy_lab.cpachecker.core.interfaces.Refiner;
-import org.sosy_lab.cpachecker.core.interfaces.Statistics;
-import org.sosy_lab.cpachecker.core.interfaces.StatisticsProvider;
+import org.sosy_lab.cpachecker.core.interfaces.*;
 import org.sosy_lab.cpachecker.core.reachedset.ReachedSet;
 import org.sosy_lab.cpachecker.core.reachedset.UnmodifiableReachedSet;
+import org.sosy_lab.cpachecker.cpa.arg.ARGState;
+import org.sosy_lab.cpachecker.cpa.predicate.BAMPredicateCPA;
 import org.sosy_lab.cpachecker.cpa.usage.UsageReachedSet;
 import org.sosy_lab.cpachecker.cpa.usage.refinement.IdentifierIterator;
+import org.sosy_lab.cpachecker.cpa.usage.storage.UsageContainer;
 import org.sosy_lab.cpachecker.cpa.value.refiner.UnsoundRefiner;
 import org.sosy_lab.cpachecker.exceptions.CPAException;
 import org.sosy_lab.cpachecker.exceptions.RefinementFailedException;
+import org.sosy_lab.cpachecker.util.AbstractStates;
+import org.sosy_lab.cpachecker.util.CPAs;
+import org.sosy_lab.cpachecker.util.identifiers.SingleIdentifier;
 
 public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSetUpdater {
 
@@ -289,17 +293,35 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
     stats.totalTimer.start();
     try {
       boolean raceFound;    // 是否发现了race
+      int dotFileIndex = 1; // for debug
       do {
         raceFound = false;
-        final AbstractState previousLastState = reached.getLastState();
-
         // run algorithm
         status = status.update(algorithm.run(reached));     // 更新可达集，不会探索完全，每轮探索一个状态的后继
-        if (((UsageReachedSet)reached).newSuccessorsInEachIteration.isEmpty()) {
-          if (reached.hasWaitingState()) {
-            continue;
+        if (((UsageReachedSet)reached).newSuccessorsInEachIteration.isEmpty()) {  // 新的一轮计算中没有产生后继状态
+          if (reached.hasWaitingState()) {    // 还有后继没有探索
+            continue;                         // 直接进入下一轮计算
           }
-          break;
+          if (!reached.hasWaitingState()) {   // 若可达图探索完成
+            if (((UsageReachedSet) reached).newPrecisionFound) {    // 有新谓词产生的话
+              try {
+                { // 重新开始计算之前，打印一些之前的ARG
+                  exportARG(reached, "./output/thread_test/debug/_" + (dotFileIndex++) + "_.dot");
+                  if (dotFileIndex > 5) break;
+                }
+
+                restart((UsageReachedSet) reached);                 // 从头开始重新计算
+                assert reached.getFirstState() != null;
+                reached.reAddToWaitlist((AbstractState) reached.getFirstState());
+                continue;
+              } catch (InterruptedException e) {
+                /* */
+              }
+            }
+            else {                                                  // 没有新谓词
+              break;                                                // 结束计算
+            }
+          }
         }
 
         notifyReachedSetUpdateListeners(reached);
@@ -310,32 +332,17 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
           break;
         }
 
-        // 如果可能存在Unsafes
-        if (haveUnsafeOrNot(reached) == true) {
-          raceFound = !checkRace(reached);   // 检查路径是否可行，如果为假反例则返回false，真反例返回true，即raceFound
+        if (haveUnsafeOrNot(reached) == true) {   // 如果可能存在Unsafes
+          raceFound = !checkRace(reached);   // 检查路径是否可行，如果为假反例则结果为false，真反例结果为true
           if (raceFound) {
+            // 如果发现了真反例，也打印一些可达图
+            exportARG(reached, "./output/thread_test/debug/_" + (dotFileIndex++) + "_.dot");
             ((UsageReachedSet) reached).setHaveUnsafes(true);
             break;
           }
-          refinedInPreviousIteration = true;
           // Note, with special options reached set still contains violated properties
           // i.e (stopAfterError = true) or race conditions analysis
         }
-        // restart exploration for unsound refiners, as due to unsound refinement
-        // a sound over-approximation has to be found for proving safety
-        else if (mRefiner instanceof UnsoundRefiner) {
-          if (!refinedInPreviousIteration) {
-            break;
-          }
-
-          ((UnsoundRefiner)mRefiner).forceRestart(reached);
-          raceFound        = true;
-          refinedInPreviousIteration  = false;
-        }
-        if (!reached.hasWaitingState()) {
-          break;
-        }
-
         // 在下一次计算后继时，清空上一次计算得到的后继
         ((UsageReachedSet)reached).newSuccessorsInEachIteration.clear();
 
@@ -343,6 +350,8 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
 
     } finally {
       stats.totalTimer.stop();
+      // 打印一下CEGAR算法的总时间
+      System.out.println("Total time for CEGAR algorithm:   " + stats.totalTimer);
     }
     return status;
   }
@@ -365,6 +374,65 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
     if (((UsageReachedSet) reached).newSuccessorsInEachIteration.isEmpty())
       return false;
     return ((UsageReachedSet)reached).haveUnsafeInNewSucs();
+  }
+
+  /**
+   * 清空可达集，更新精度从头开始
+   * @param reached
+   * @return
+   * @throws CPAException
+   * @throws InterruptedException
+   */
+  private void restart(UsageReachedSet pReached) throws InterruptedException {
+
+        Set<SingleIdentifier> falseUnsafes = new HashSet<>(pReached.getUsageContainer().getFalseUnsafes());
+        AbstractState firstState = pReached.getFirstState();
+        ConfigurableProgramAnalysis cpa = ((IdentifierIterator)mRefiner).getCpa();
+        ARGState.clearIdGenerator();
+        Map<SingleIdentifier, AdjustablePrecision> precisionMap = new HashMap<>(pReached.precisionMap); // 拷贝
+        AdjustablePrecision finalPrecision = new AdjustablePrecision() {
+          @Override
+          public AdjustablePrecision add(AdjustablePrecision otherPrecision) {
+            return null;
+          }
+
+          @Override
+          public AdjustablePrecision subtract(AdjustablePrecision otherPrecision) {
+            return null;
+          }
+
+          @Override
+          public boolean isEmpty() {
+            return false;
+          }
+        };
+        finalPrecision = pReached.finalPrecision;
+        pReached.clear(); // 清空可达集合
+
+        pReached.processedUnsafes.addAll(
+                Sets.intersection(precisionMap.keySet(), falseUnsafes));
+
+        /**
+         * @from 返回processedUnsafe的迭代器，processedUnsafe为FluentIterable<SingleIdentifier>，所以返回的应该是指向某个SingleIdentifier的迭代器
+         * @transform 调用者提供参数，括号内为lambda表达式或方法引用
+         * @precisionMap::remove 传入的是key，将含有key的映射移除，如果移除之前key对应的值不为空则返回该值，否则返回null
+         * @from(processedUnsafes).transform(precisionMap::remove) 将processedUnsafes中id在precisionMap中对应的精度取出来
+         * @filter(Predicates.notNull) 过滤掉不满足条件的，即过滤掉不满足Predicates.notNull的
+         * @Predicates.notNull 返回这样的predicate：只要对象引用不为空，计算结果就为true
+         * 所以是遍历ProcessedUnsafes中的id，将id在precisionMap中对应的精度取出来，如果为空就过滤掉，不为空则保存到局部变量prec中
+         */
+        for (AdjustablePrecision prec :
+                from(pReached.processedUnsafes)
+                        .transform(pReached.precisionMap::remove)
+                        .filter(Predicates.notNull())) {
+          pReached.finalPrecision = finalPrecision.subtract(prec);   // 减去一些精度，像是想减去FalseUnsafe的精度
+        }
+
+        CFANode firstNode = AbstractStates.extractLocation(firstState);
+        //Get new state to remove all links to the old ARG
+        pReached.add(cpa.getInitialState(firstNode, StateSpacePartition.getDefaultPartition()), pReached.finalPrecision);
+        pReached.getUsageContainer().resetHaveUnsafesIds();
+        //TODO should we signal about removed ids?
   }
 
   @SuppressWarnings("NonAtomicVolatileUpdate") // statistics written only by one thread

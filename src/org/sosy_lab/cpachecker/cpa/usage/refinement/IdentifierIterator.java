@@ -292,7 +292,7 @@ public class IdentifierIterator extends WrappedConfigurableRefinementBlock<Reach
       throw new UnsupportedOperationException("UsageRefiner requires UsageReachedSet");
     }
     UsageContainer container = uReached.getUsageContainer();
-    Set<SingleIdentifier> processedUnsafes = new HashSet<>();
+//    Set<SingleIdentifier> processedUnsafes = new HashSet<>();   //
 
     logger.log(Level.INFO, ("Perform US refinement: " + i++));
     int originUnsafeSize = container.getTotalUnsafeSize();
@@ -301,6 +301,7 @@ public class IdentifierIterator extends WrappedConfigurableRefinementBlock<Reach
     }
     int counter = lastFalseUnsafeSize - originUnsafeSize;
     boolean raceIsReachable = false;  //用来标志race是否可行
+//    boolean newPrecisionFound = false;//用来标志是否存在虚假反例
 
     sendUpdateSignal(PredicateRefinerAdapter.class, pReached);
     sendUpdateSignal(PointIterator.class, container);
@@ -323,16 +324,19 @@ public class IdentifierIterator extends WrappedConfigurableRefinementBlock<Reach
        * 这里针对细化的结果可以将真反例打印出来
        */
       if (result.isTrue())
-        System.out.println("race:"+result.getTrueRace().getFirst().getCFANode()+result.getTrueRace().getSecond().getCFANode());
+        System.out.println("race:"+result.getTrueRace().getFirst().getCFANode()+" && "+result.getTrueRace().getSecond().getCFANode());
 
       stats.innerRefinementTimer.stop();
 
       Collection<AdjustablePrecision> info = result.getPrecisions();    // 从反例中得到的新精度(谓词)
 
       if (!info.isEmpty()) {    //获取的新精度不为空
+        //((UsageReachedSet)uReached).getUsageContainer().falseUnsafeAdd(currentId);  // 将currentId添加到container中的falseUnsafes中
+        uReached.newPrecisionFound = true;
         stats.precisionTimer.start();
         AdjustablePrecision updatedPrecision =
-                precisionMap.getOrDefault(currentId, initialPrecision);   // 如果currentId原本就有精度，则返回原来的精度，否则将其精度设置为initialPrecision
+                precisionMap.getOrDefault(currentId, initialPrecision);   // 如果currentId原本就有精度，则返回原来的精度，否则返回initialPrecision
+        updatedPrecision = uReached.precisionMap.getOrDefault(currentId, initialPrecision);
 
         for (AdjustablePrecision p : info) {
           updatedPrecision = updatedPrecision.add(p); // 添加新发现的精度
@@ -340,7 +344,9 @@ public class IdentifierIterator extends WrappedConfigurableRefinementBlock<Reach
 
         assert !updatedPrecision.isEmpty() : "Updated precision is expected to be not empty";
         precisionMap.put(currentId, updatedPrecision);
-        finalPrecision = finalPrecision.add(updatedPrecision);
+        uReached.precisionMap.put(currentId, updatedPrecision);
+//        finalPrecision = finalPrecision.add(updatedPrecision);
+        uReached.finalPrecision = finalPrecision.add(updatedPrecision);
         isPrecisionChanged = true;
         stats.precisionTimer.stop();
       }
@@ -348,13 +354,13 @@ public class IdentifierIterator extends WrappedConfigurableRefinementBlock<Reach
       if (result.isTrue()) {    // 如果race可行
         raceIsReachable = true;
         container.setAsRefined(currentId, result); // 将currentId对应的条目从unrefinedIds中移除，添加到refinedIds中，同时将该Id对应及其对应的访问对放入stableUnsafes中
-        processedUnsafes.add(currentId);    // 添加到processedUnsafes中的id要么是形成真实race的id，要么是选择进行忽略的id
+        uReached.processedUnsafes.add(currentId);    // 添加到processedUnsafes中的id要么是形成真实race的id，要么是选择进行忽略的id
       } else if (hideFilteredUnsafes && result.isFalse() && !isPrecisionChanged) {  // 如果设置了hideFilteredUnsafe为true，默认设置为false
         //We do not add a precision, but consider the unsafe as false               // 对于假的race，可能存在不产生新精度的情况，此时通过设置hideFilteredUnsafes来隐藏
         //set it as false now, because it will occur again, as precision is not changed
         //We can not look at precision size here - the result can be false due to heuristics
         container.setAsFalseUnsafe(currentId);    // 将对应的id放到falseUnsafe中，同时将该id从unrefinedIds中移除
-        processedUnsafes.add(currentId);
+        uReached.processedUnsafes.add(currentId);
       }
     }
     int newTrueUnsafeSize = container.getProcessedUnsafeSize();
@@ -370,7 +376,7 @@ public class IdentifierIterator extends WrappedConfigurableRefinementBlock<Reach
       lastTrueUnsafes = newTrueUnsafeSize;
     }
     if (!raceIsReachable) {    // 如果没有可行的race
-      // 继续探索
+      // 继续探索 or 从头开始
     }
     logger.log(Level.INFO, container.getUnsafeStatus());
     //pStat.UnsafeCheck.stopIfRunning();
@@ -384,6 +390,11 @@ public class IdentifierIterator extends WrappedConfigurableRefinementBlock<Reach
   //检查race是否是不可行的
   public boolean performCheck(ReachedSet pReached) throws CPAException, InterruptedException {
     return performRefinementForRaceVerification(pReached).isTrue();
+  }
+
+  // 返回cpa
+  public ConfigurableProgramAnalysis getCpa() {
+    return cpa;
   }
 
   @Override

@@ -12,13 +12,9 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
-import java.util.Iterator;
-import java.util.Map;
+
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.NavigableMap;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.logging.Level;
 import org.sosy_lab.common.log.LogManager;
@@ -37,13 +33,14 @@ import org.sosy_lab.cpachecker.util.statistics.StatisticsWriter;
 public class UsageContainer {
   private final NavigableMap<SingleIdentifier, UnrefinedUsagePointSet> unrefinedIds;
   private final NavigableMap<SingleIdentifier, RefinedUsagePointSet> refinedIds;
+  // 添加的变量用来判断是否有可能存在Unsafe的id，如果一轮迭代中没有发现真实的Unsafe，则需要清空，下一轮迭代中重新计算
   private final NavigableMap<SingleIdentifier, UnrefinedUsagePointSet> haveUnsafesIds;
 
   private Map<SingleIdentifier, Pair<UsageInfo, UsageInfo>> stableUnsafes = new TreeMap<>();
 
   private final UnsafeDetector detector;
 
-  private Set<SingleIdentifier> falseUnsafes;
+  private Set<SingleIdentifier> falseUnsafes = new HashSet<>();
   private Set<SingleIdentifier> initialUnsafes;
 
   // Only for statistics
@@ -384,4 +381,14 @@ public class UsageContainer {
 
     unsafeDetectionTimer.stop();
   }
+
+  public void setFalseUnsafes(Set<SingleIdentifier> pFalseUnsafes) {
+    falseUnsafes = pFalseUnsafes;
+  }
+
+  public void falseUnsafeAdd(SingleIdentifier id) {
+    falseUnsafes.add(id);
+  }
+
+  public void resetHaveUnsafesIds() { haveUnsafesIds.clear(); }
 }

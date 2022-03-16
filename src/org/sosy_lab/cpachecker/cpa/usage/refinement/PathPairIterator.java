@@ -276,7 +276,7 @@ public class PathPairIterator extends
       targetToPathIterator.put(info, pathIterator);
     }
     if (pathCalculated[usageNumber] < iterationLimit) {
-      currentPath = pathIterator.nextPath(refinedStates);
+      currentPath = pathIterator.nextPath(refinedStates);  // 计算路径
       pathCalculated[usageNumber]++;
     } else {
       currentPath = null;

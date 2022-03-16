@@ -48,6 +48,7 @@ import org.sosy_lab.cpachecker.core.interfaces.TransferRelation;
 import org.sosy_lab.cpachecker.core.interfaces.WrapperTransferRelation;
 import org.sosy_lab.cpachecker.core.interfaces.pcc.ProofChecker;
 import org.sosy_lab.cpachecker.cpa.assumptions.storage.AssumptionStorageState;
+import org.sosy_lab.cpachecker.cpa.location.LocationState;
 import org.sosy_lab.cpachecker.cpa.predicate.PredicateAbstractState;
 import org.sosy_lab.cpachecker.cpa.predicate.PredicateTransferRelation;
 import org.sosy_lab.cpachecker.exceptions.CPATransferException;
@@ -340,6 +341,11 @@ final class CompositeTransferRelation implements WrapperTransferRelation {
     List<AbstractState> componentElements = compositeState.getWrappedStates();
     checkArgument(componentElements.size() == size, "State with wrong number of component states given");
     List<Collection<? extends AbstractState>> allComponentsSuccessors = new ArrayList<>(size);
+
+    // 设置一下断点
+//    if (((LocationState) compositeState.getWrappedStates().get(0)).getLocationNode().toString().equals("N8")) {
+//      System.out.println("");
+//    }
 
     for (int i = 0; i < size; i++) {
       TransferRelation lCurrentTransfer = transferRelations.get(i);

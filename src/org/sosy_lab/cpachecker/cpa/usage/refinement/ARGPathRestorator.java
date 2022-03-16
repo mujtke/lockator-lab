@@ -58,7 +58,7 @@ public class ARGPathRestorator implements PathRestorator {
     for (List<Integer> newList : pRefinedStates) {
       remainingStates.add(new ArrayDeque<>(newList));
     }
-    List<ARGState> states = new ArrayList<>(); // reversed order
+    List<ARGState> states = new ArrayList<>(); // reversed order //存储路径上的状态
     Set<ARGState> seenElements = new HashSet<>();
 
     // each element of the path consists of the abstract state and the outgoing
@@ -74,31 +74,31 @@ public class ARGPathRestorator implements PathRestorator {
       Iterator<ARGState> parents = currentARGState.getParents().iterator();
 
       ARGState parentElement = parents.next();
-      while (seenElements.contains(parentElement) && parents.hasNext()) {
+      while (seenElements.contains(parentElement) && parents.hasNext()) {     // 如果父节点已经探索过，则跳过该节点，选取下一个父节点
         // while seenElements already contained parentElement, try next parent
         parentElement = parents.next();
       }
 
-      if (seenElements.contains(parentElement)) {
+      if (seenElements.contains(parentElement)) {   // 如果当前获取的父节点已经被访问过
         // Backtrack
         if (backTrackPoints.isEmpty()) {
           throw new IllegalArgumentException("No ARG path from the target state to a root state.");
         }
         ARGState backTrackPoint = backTrackPoints.pop();
         ListIterator<ARGState> stateIterator = states.listIterator(states.size());
-        while (stateIterator.hasPrevious() && !stateIterator.previous().equals(backTrackPoint)) {
+        while (stateIterator.hasPrevious() && !stateIterator.previous().equals(backTrackPoint)) { // states中不断回退，知道到达回溯点
           stateIterator.remove();
         }
         List<ARGState> options = backTrackOptions.pop();
         for (ARGState parent : backTrackPoint.getParents()) {
           if (!options.contains(parent)) {
-            seenElements.add(parent);
+            seenElements.add(parent);       // 将不在候选的状态添加到已访问的状态集合中
           }
         }
-        currentARGState = backTrackPoint;
+        currentARGState = backTrackPoint;  // 设置回溯点为当前状态
       } else {
         // Record backtracking options
-        if (parents.hasNext()) {
+        if (parents.hasNext()) {           // 如果一个节点有多个父亲节点，则将剩余的节点放到options中
           List<ARGState> options = new ArrayList<>(1);
           while (parents.hasNext()) {
             ARGState parent = parents.next();
@@ -106,15 +106,15 @@ public class ARGPathRestorator implements PathRestorator {
               options.add(parent);
             }
           }
-          if (!options.isEmpty()) {
+          if (!options.isEmpty()) {        // 如果当前节点的父节点有多个，则当前节点是一个回溯点（可以回溯到该位置探索其他父亲节点）
             backTrackPoints.push(currentARGState);
-            backTrackOptions.push(options);
+            backTrackOptions.push(options);// 将options保存的当前节点的其他父亲节点保存到回溯候选中
           }
         }
 
-        if (checkRepeatitionOfState(parentElement, remainingStates)) {
-          return null;
-        }
+//        if (checkRepeatitionOfState(parentElement, remainingStates)) {
+//          return null;
+//        }
         seenElements.add(parentElement);
         states.add(parentElement);
 
@@ -158,12 +158,13 @@ public class ARGPathRestorator implements PathRestorator {
 
     @Override
     public ARGPath nextPath(Set<List<Integer>> pRefinedStatesIds) {
-      if (computeOnePath) {
-        return null;
-      } else {
-        computeOnePath = true;
-        return ARGPathRestorator.this.computePath(target, pRefinedStatesIds, stack);
-      }
+//      if (computeOnePath) {
+//        return null;
+//      } else {
+//        computeOnePath = true;
+//        return ARGPathRestorator.this.computePath(target, pRefinedStatesIds, stack);
+//      }
+      return ARGPathRestorator.this.computePath(target, pRefinedStatesIds, stack);    // 假如跳过computeOnePath的判断
     }
 
   }
