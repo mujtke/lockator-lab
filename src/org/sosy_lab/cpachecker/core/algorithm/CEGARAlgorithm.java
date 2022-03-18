@@ -17,6 +17,7 @@ import static org.sosy_lab.cpachecker.util.statistics.StatisticsUtils.div;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Sets;
+import de.uni_freiburg.informatik.ultimate.util.ScopeUtils;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.PrintStream;
 import java.util.*;
@@ -305,10 +306,10 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
           if (!reached.hasWaitingState()) {   // 若可达图探索完成
             if (((UsageReachedSet) reached).newPrecisionFound) {    // 有新谓词产生的话
               try {
-                { // 重新开始计算之前，打印一些之前的ARG
-                  exportARG(reached, "./output/thread_test/debug/_" + (dotFileIndex++) + "_.dot");
-                  if (dotFileIndex > 5) break;
-                }
+//                { // 重新开始计算之前，打印一些之前的ARG
+//                  exportARG(reached, "./output/thread_test/debug/_" + (dotFileIndex++) + "_.dot");
+//                  if (dotFileIndex > 5) break;
+//                }
 
                 restart((UsageReachedSet) reached);                 // 从头开始重新计算
                 assert reached.getFirstState() != null;
@@ -336,7 +337,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
           raceFound = !checkRace(reached);   // 检查路径是否可行，如果为假反例则结果为false，真反例结果为true
           if (raceFound) {
             // 如果发现了真反例，也打印一些可达图
-            exportARG(reached, "./output/thread_test/debug/_" + (dotFileIndex++) + "_.dot");
+//            exportARG(reached, "./output/thread_test/debug/_" + (dotFileIndex++) + "_.dot");
             ((UsageReachedSet) reached).setHaveUnsafes(true);
             break;
           }
@@ -432,6 +433,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
         //Get new state to remove all links to the old ARG
         pReached.add(cpa.getInitialState(firstNode, StateSpacePartition.getDefaultPartition()), pReached.finalPrecision);
         pReached.getUsageContainer().resetHaveUnsafesIds();
+        pReached.newPrecisionFound = false;   // 将是否发现谓词重置为false，如果上一次发现了谓词，需重新开始探索时需要重置，因为新的轮次中可能没有谓词产生
         //TODO should we signal about removed ids?
   }
 
