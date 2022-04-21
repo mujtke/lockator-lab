@@ -11,6 +11,8 @@ package org.sosy_lab.cpachecker.core;
 import static com.google.common.base.Verify.verifyNotNull;
 
 import java.util.logging.Level;
+
+import my_lab.algorithm.Plan_C_Algorithm;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.sosy_lab.common.ShutdownManager;
 import org.sosy_lab.common.ShutdownNotifier;
@@ -105,6 +107,10 @@ public class CoreComponentsFactory {
         + "\nYou need to specify a refiner with the cegar.refiner option."
         + "\nCurrently all refiner require the use of the ARGCPA.")
   private boolean useCEGAR = false;
+
+  @Option(secure=true, name="algorithm.usePlan_C_Algorithm",
+    description = "use algorithm for Plan_C")
+  private boolean usePlan_C_Algorithm = false;
 
   @Option(
       secure = true,
@@ -471,10 +477,18 @@ public class CoreComponentsFactory {
         algorithm = new AnalysisWithRefinableEnablerCPAAlgorithm(algorithm, cpa, cfa, logger, config, shutdownNotifier);
       }
 
-      if (useCEGAR) {
+      if (useCEGAR) {     // 使用CEGAR
         algorithm =
             new CEGARAlgorithmFactory(algorithm, cpa, logger, config, shutdownNotifier)
                 .newInstance();
+      }
+
+      /**
+       * 为Plan_C添加的，如果使用usePlan_C_Algorithm的话
+       * 用来生成需要的algorithm
+       */
+      if (usePlan_C_Algorithm) {
+        algorithm = new Plan_C_Algorithm.Plan_C_AlgorithmFactory(algorithm, cpa, logger, config, shutdownNotifier).newInstance();
       }
 
       if (usePDR) {

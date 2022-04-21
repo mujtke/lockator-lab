@@ -20,6 +20,8 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
+
+import my_lab.usage.Plan_C_UsageReachedSet;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.sosy_lab.common.ShutdownNotifier;
 import org.sosy_lab.common.configuration.ClassOption;
@@ -45,6 +47,7 @@ import org.sosy_lab.cpachecker.core.interfaces.StopOperator;
 import org.sosy_lab.cpachecker.core.interfaces.TransferRelation;
 import org.sosy_lab.cpachecker.core.reachedset.ReachedSet;
 import org.sosy_lab.cpachecker.core.reachedset.UnmodifiableReachedSet;
+import org.sosy_lab.cpachecker.cpa.ThreadingForPlanC.Plan_C_threadingState;
 import org.sosy_lab.cpachecker.cpa.arg.ARGMergeJoinCPAEnabledAnalysis;
 import org.sosy_lab.cpachecker.cpa.arg.ARGState;
 import org.sosy_lab.cpachecker.cpa.location.LocationState;
@@ -57,6 +60,8 @@ import org.sosy_lab.cpachecker.util.statistics.StatCounter;
 import org.sosy_lab.cpachecker.util.statistics.StatHist;
 import org.sosy_lab.cpachecker.util.statistics.StatInt;
 import org.sosy_lab.cpachecker.util.statistics.StatisticsWriter;
+
+import static org.sosy_lab.cpachecker.util.AbstractStates.extractStateByType;
 
 public class CPAAlgorithm implements Algorithm, StatisticsProvider {
 
@@ -256,43 +261,6 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
       stats.updateReachedSetStatistics(reachedSet.getStatistics());
     }
   }
-
-//  private AlgorithmStatus run0(final ReachedSet reachedSet) throws CPAException, InterruptedException {
-//    while (reachedSet.hasWaitingState()) {
-//      shutdownNotifier.shutdownIfNecessary();
-//
-//      stats.countIterations++;
-//
-//      // Pick next state using strategy
-//      // BFS, DFS or top sort according to the configuration
-//      int size = reachedSet.getWaitlist().size();
-//      if (size >= stats.maxWaitlistSize) {
-//        stats.maxWaitlistSize = size;
-//      }
-//      stats.countWaitlistSize += size;
-//
-//      stats.chooseTimer.start();
-//      final AbstractState state = reachedSet.popFromWaitlist();     //取出的状态
-//      final Precision precision = reachedSet.getPrecision(state);   //取出的状态对应的精度
-//      stats.chooseTimer.stop();
-//
-//      logger.log(Level.FINER, "Retrieved state from waitlist");
-//      try {
-//        if (handleState(state, precision, reachedSet)) {
-//          // Prec operator requested break
-//          return status;
-//        }
-//      } catch (Exception e) {
-//        // re-add the old state to the waitlist, there might be unhandled successors left
-//        // that otherwise would be forgotten (which would be unsound)
-//        reachedSet.reAddToWaitlist(state);
-//        throw e;
-//      }
-//
-//    }
-//
-//    return status;
-//  }
 
   /**
    * 不再一直探索，每探索一个状态的后继之后，就退出进行下一轮
@@ -495,20 +463,30 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
         stats.stopTimer.stop();
       }
 
-      if (stop) {   // 如果successor被覆盖
+      if (stop) {   // 如果successor被覆盖，这里包含BDD覆盖和Location覆盖
         logger.log(Level.FINER, "Successor is covered or unreachable, not adding to waitlist");
         stats.countStop++;
-
+        
       } else {    // !stop(e_hat, reached, π_hat)，如果successor没有被覆盖，则将successor及其对应的精度放到reachedSet中，同时也会将相应的successor放到Waitlist中
-        logger.log(Level.FINER, "No need to stop, adding successor to waitlist");
 
-        stats.addTimer.start();
-        reachedSet.add(successor, successorPrecision);    //reached = reached U {(e_hat, π_hat)}
+        if (extractStateByType(successor, Plan_C_threadingState.class).locationCovered) { // 如果满足Location覆盖
+          /**
+           * 将该状态暂时放到被覆盖列表中
+           */
+          ((Plan_C_UsageReachedSet)reachedSet).coveredStatesTable.put(successor, successorPrecision); //
+          ((Plan_C_UsageReachedSet)reachedSet).addButSkipWaitlist(successor, successorPrecision); // 该状态需要添加到reachedSet中，否则会报找不到精度的问题（将状态重新放回Waitlist中时，状态的精度是丢失的）
+          // 这里需要重写add方法，不要将状态放回到waitlist中去
+        } else {
+          logger.log(Level.FINER, "No need to stop, adding successor to waitlist");
 
-        // 将对应的后继添加到newSuccessorsInEachIteration中
-        ((UsageReachedSet) reachedSet).newSuccessorsInEachIteration.put(successor, successorPrecision);
+          stats.addTimer.start();
+          reachedSet.add(successor, successorPrecision);    //reached = reached U {(e_hat, π_hat)}
 
-        stats.addTimer.stop();
+          // 将对应的后继添加到newSuccessorsInEachIteration中
+          ((Plan_C_UsageReachedSet) reachedSet).newSuccessorsInEachIteration.put(successor, successorPrecision);
+
+          stats.addTimer.stop();
+        }
       }
     }
 

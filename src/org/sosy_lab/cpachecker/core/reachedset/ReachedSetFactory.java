@@ -10,6 +10,7 @@ package org.sosy_lab.cpachecker.core.reachedset;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import my_lab.usage.Plan_C_UsageConfiguration;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.sosy_lab.common.configuration.Configuration;
 import org.sosy_lab.common.configuration.InvalidConfigurationException;
@@ -38,7 +39,7 @@ import org.sosy_lab.cpachecker.cpa.automaton.AutomatonVariableWaitlist;
 import org.sosy_lab.cpachecker.cpa.usage.UsageReachedSet;
 import org.sosy_lab.cpachecker.cpa.usage.storage.UsageConfiguration;
 
-@Options(prefix="analysis")
+@Options(prefix="analysis", description = "不同的可达集合类型，为Plan_C设置其对应的PlAN_C_USAGE")
 public class ReachedSetFactory {
 
   private enum ReachedSetType {
@@ -46,7 +47,8 @@ public class ReachedSetFactory {
     LOCATIONMAPPED,
     PARTITIONED,
     PSEUDOPARTITIONED,
-    USAGE
+    USAGE,
+    PLAN_C_USAGE
   }
 
   @Option(
@@ -204,6 +206,7 @@ public class ReachedSetFactory {
 
   private @Nullable BlockConfiguration blockConfig;
   private @Nullable UsageConfiguration usageConfig;
+  private my_lab.usage.Plan_C_UsageConfiguration plan_c_usageConfiguration;     // for Plan_C_UsageConfiguration
   private WeightedRandomWaitlist.@Nullable WaitlistOptions weightedWaitlistOptions;
   private final LogManager logger;
 
@@ -221,6 +224,11 @@ public class ReachedSetFactory {
       usageConfig = new UsageConfiguration(pConfig);
     } else {
       usageConfig = null;
+    }
+    if (reachedSet == ReachedSetType.PLAN_C_USAGE) {          // 为Plan_C_UsageConfiguration进行设置
+      plan_c_usageConfiguration = new Plan_C_UsageConfiguration(pConfig);
+    } else {
+      plan_c_usageConfiguration = null;
     }
     if (useWeightedDepthOrder || useWeightedBranchOrder) {
       weightedWaitlistOptions = new WeightedRandomWaitlist.WaitlistOptions(pConfig);
@@ -299,6 +307,9 @@ public class ReachedSetFactory {
         break;
     case USAGE:
         reached = new UsageReachedSet(waitlistFactory, usageConfig, logger);
+        break;
+    case PLAN_C_USAGE:          // 用于Plan_C
+        reached = new my_lab.usage.Plan_C_UsageReachedSet(waitlistFactory, plan_c_usageConfiguration, logger);
         break;
     case NORMAL:
     default:

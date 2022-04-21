@@ -94,6 +94,17 @@ class DefaultReachedSet implements ReachedSet, Serializable {
     }
   }
 
+  /**
+   * 将covered State放入reachedSet中，但是不会将其放入waitlist中去
+   * @param pState
+   * @param pPrecision
+   */
+  public void addButSkipWaitlist(AbstractState pState, Precision pPrecision) {
+    Preconditions.checkNotNull(pState);
+    Preconditions.checkNotNull(pPrecision);
+    reached.put(pState, pPrecision);
+  }
+
   @Override
   public void addAll(Iterable<Pair<AbstractState, Precision>> toAdd) {
     for (Pair<AbstractState, Precision> pair : toAdd) {
@@ -106,6 +117,16 @@ class DefaultReachedSet implements ReachedSet, Serializable {
     Preconditions.checkNotNull(s);
     Preconditions.checkArgument(reached.containsKey(s), "State has to be in the reached set");
 
+    if (!waitlist.contains(s)) {
+      waitlist.add(s);
+    }
+  }
+
+  /**
+   * 用于将coveredStatesTable中的状态添加到waitlist中
+   * @param s 需要重新添加到waitlist中的状态
+   */
+  public void putBackToWaitlist(AbstractState s) {
     if (!waitlist.contains(s)) {
       waitlist.add(s);
     }

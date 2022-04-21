@@ -392,4 +392,8 @@ public class UsageContainer {
   }
 
   public void resetHaveUnsafesIds() { haveUnsafesIds.clear(); }
+
+  public NavigableMap<SingleIdentifier, UnrefinedUsagePointSet> getUnrefinedIds() {
+    return unrefinedIds;
+  }
 }

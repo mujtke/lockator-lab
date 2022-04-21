@@ -135,9 +135,9 @@ public final class ThreadingTransferRelation extends SingleEdgeTransferRelation 
 
     ThreadingState state = (ThreadingState) pState;
 
-    ThreadingState threadingState = exitThreads(state);
+    ThreadingState threadingState = exitThreads(state); // 已经结束的线程需要退出
 
-    final String activeThread = getActiveThread(cfaEdge, threadingState);
+    final String activeThread = getActiveThread(cfaEdge, threadingState);   // 获取当前边所在的线程
     if (null == activeThread) {
       return ImmutableSet.of();
     }
@@ -186,8 +186,8 @@ public final class ThreadingTransferRelation extends SingleEdgeTransferRelation 
   private String getActiveThread(final CFAEdge cfaEdge, final ThreadingState threadingState) {
     final Set<String> activeThreads = new HashSet<>();
     for (String id : threadingState.getThreadIds()) {
-      if (Iterables.contains(threadingState.getThreadLocation(id).getOutgoingEdges(), cfaEdge)) {
-        activeThreads.add(id);
+      if (Iterables.contains(threadingState.getThreadLocation(id).getOutgoingEdges(), cfaEdge)) {   // 如果某个线程位置的出边与当前边相同
+        activeThreads.add(id);                  // 则返回该线程id
       }
     }
 
@@ -348,7 +348,7 @@ public final class ThreadingTransferRelation extends SingleEdgeTransferRelation 
     return Objects.equals(cfa.getMainFunction().getExitNode(), edge.getSuccessor());
   }
 
-  private ThreadingState exitThreads(ThreadingState tmp) {
+  private ThreadingState exitThreads(ThreadingState tmp) {      // 已经退出的线程需要被移除
     // clean up exited threads.
     // this is done before applying any other step.
     for (String id : tmp.getThreadIds()) {
@@ -409,7 +409,7 @@ public final class ThreadingTransferRelation extends SingleEdgeTransferRelation 
 
     } else {
       // a default reachability analysis can determine the thread-number on its own.
-      int newThreadNum = threadingState.getSmallestMissingThreadNum();
+      int newThreadNum = threadingState.getSmallestMissingThreadNum();    //获取一个没有使用过得线程编号
       return createThreadWithNumber(threadingState, id, functionName, newThreadNum, results);
     }
   }

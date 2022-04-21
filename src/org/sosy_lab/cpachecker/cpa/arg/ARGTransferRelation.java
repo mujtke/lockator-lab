@@ -33,6 +33,11 @@ public class ARGTransferRelation extends AbstractSingleWrapperTransferRelation {
       throws CPATransferException, InterruptedException {
     ARGState element = (ARGState)pElement;
 
+    /**
+     * for debug
+     */
+    System.out.println("ARGState id:" + ((ARGState) pElement).getStateId());
+
     // covered elements may be in the reached set, but should always be ignored
     if (element.isCovered()) {
       return ImmutableSet.of();

@@ -460,7 +460,7 @@ analysis.traversal.useReverseLoopstack = false
 # secondary strategy that is used if there are two states with the same
 # reverse postorder id. The secondary strategy is selected with
 # 'analysis.traversal.order'.
- = false
+analysis.traversal.useReversePostorder = false
 
 # use thread-modular ordering: thread transitions first, then environment
 # transitions
@@ -3052,7 +3052,7 @@ cpa.uninitvars.stop = "sep"
   allowed values: [sep, join]
 
 # functions, which stops analysis
-cpa.usage.abortfunctions = {}
+cpa.usage.abortFunctions = {}
 
 # bind arguments of functions with passed variables
 cpa.usage.bindArgsFunctions = false

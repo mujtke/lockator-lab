@@ -11,6 +11,7 @@ package org.sosy_lab.cpachecker.core.algorithm;
 import static com.google.common.base.Verify.verifyNotNull;
 import static com.google.common.collect.FluentIterable.from;
 import static my_lab.GlobalMethods.exportARG;
+import static my_lab.GlobalMethods.printUsagesInfo;
 import static org.sosy_lab.cpachecker.util.AbstractStates.isTargetState;
 import static org.sosy_lab.cpachecker.util.statistics.StatisticsUtils.div;
 
@@ -24,6 +25,8 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
+
+import my_lab.GlobalMethods;
 import org.sosy_lab.common.AbstractMBean;
 import org.sosy_lab.common.ShutdownNotifier;
 import org.sosy_lab.common.configuration.ClassOption;
@@ -295,6 +298,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
     try {
       boolean raceFound;    // 是否发现了race
       int dotFileIndex = 1; // for debug
+      int usagePairFileIndex = 1; // for debug
       do {
         raceFound = false;
         // run algorithm
@@ -304,12 +308,12 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
             continue;                         // 直接进入下一轮计算
           }
           if (!reached.hasWaitingState()) {   // 若可达图探索完成
+
             if (((UsageReachedSet) reached).newPrecisionFound) {    // 有新谓词产生的话
               try {
-//                { // 重新开始计算之前，打印一些之前的ARG
-//                  exportARG(reached, "./output/thread_test/debug/_" + (dotFileIndex++) + "_.dot");
-//                  if (dotFileIndex > 5) break;
-//                }
+                { // 重新开始计算之前，打印一些之前的ARG
+                  exportARG(reached, "./output/thread_test/debug/_" + (dotFileIndex++) + "_.dot");
+                }
 
                 restart((UsageReachedSet) reached);                 // 从头开始重新计算
                 assert reached.getFirstState() != null;
@@ -334,6 +338,12 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
         }
 
         if (haveUnsafeOrNot(reached) == true) {   // 如果可能存在Unsafes
+
+          {// 打印一下unrefinedIds
+//            printUsagesInfo("./output/thread_test/debug/" + (usagePairFileIndex++) + ".txt", ((UsageReachedSet) reached).getUsageContainer().getUnrefinedIds());
+//            System.out.println(((UsageReachedSet) reached).getUnsafes().toString()+"\n");
+          }
+
           raceFound = !checkRace(reached);   // 检查路径是否可行，如果为假反例则结果为false，真反例结果为true
           if (raceFound) {
             // 如果发现了真反例，也打印一些可达图
@@ -353,6 +363,10 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
       stats.totalTimer.stop();
       // 打印一下CEGAR算法的总时间
       System.out.println("Total time for CEGAR algorithm:   " + stats.totalTimer);
+
+      // 打印一下threading对应的ARG
+      exportARG(reached, "./output/thread_test/debug/_" + "thread16_.dot");
+
     }
     return status;
   }

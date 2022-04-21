@@ -35,6 +35,8 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.logging.Level;
 import java.util.zip.GZIPInputStream;
+
+import my_lab.usage.Plan_C_UsageReachedSet;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.sosy_lab.common.AbstractMBean;
 import org.sosy_lab.common.Optionals;
@@ -404,8 +406,8 @@ public class CPAchecker {
 //        if (reached.hasViolatedProperties()) {
 //          violatedPropertyDescription = Joiner.on(", ").join(reached.getViolatedProperties());
         // 这里修改一下获取违反的属性的方式
-          if (((UsageReachedSet)reached).haveUnsafes()) {
-            violatedPropertyDescription = Joiner.on(", ").join(((UsageReachedSet) reached).getUnsafesProperties());
+          if (((Plan_C_UsageReachedSet)reached).haveUnsafes()) {
+            violatedPropertyDescription = Joiner.on(", ").join(((Plan_C_UsageReachedSet) reached).getUnsafesProperties());
 
           if (!status.isPrecise()) {
             result = Result.UNKNOWN;

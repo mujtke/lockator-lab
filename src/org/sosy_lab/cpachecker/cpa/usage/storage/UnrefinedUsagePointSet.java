@@ -8,10 +8,7 @@
 
 package org.sosy_lab.cpachecker.cpa.usage.storage;
 
-import java.util.Iterator;
-import java.util.Map;
-import java.util.NavigableSet;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import org.sosy_lab.cpachecker.cpa.usage.UsageInfo;
@@ -72,8 +69,23 @@ public class UnrefinedUsagePointSet implements AbstractUsagePointSet {
     topUsages.add(newPoint);
   }
 
+  /**
+   * 此方法慎用，存在异常
+   * @param point
+   * @return
+   */
   public UsageInfoSet getUsageInfo(UsagePoint point) {
-    return usageInfoSets.get(point);
+
+    Iterator<Map.Entry<UsagePoint, UsageInfoSet>> it = usageInfoSets.entrySet().iterator();
+    while (it.hasNext()) {
+      Map.Entry<UsagePoint, UsageInfoSet> entry = it.next();
+      if (entry.getKey().equals(point)) {
+        return entry.getValue();
+      }
+    }
+
+    assert false;
+    return null;
   }
 
   @Override
@@ -92,20 +104,36 @@ public class UnrefinedUsagePointSet implements AbstractUsagePointSet {
     usageInfoSets.clear();
   }
 
-  public void remove(UsageState pUstate) {
-    //Attention! Use carefully. May not work
-    for (UsagePoint point : new TreeSet<>(usageInfoSets.keySet())) {
-      UsageInfoSet uset = usageInfoSets.get(point);
-      boolean b = uset.remove(pUstate);
-      if (b) {
-        if (uset.isEmpty()) {
-          usageInfoSets.remove(point);
+//  public void remove(UsageState pUstate) {    // 有问题
+//    //Attention! Use carefully. May not work
+//    for (UsagePoint point : new TreeSet<>(usageInfoSets.keySet())) {
+//      UsageInfoSet uset = usageInfoSets.get(point);
+//      boolean b = uset.remove(pUstate);
+//      if (b) {
+//        if (uset.isEmpty()) {
+//          usageInfoSets.remove(point);
+//        }
+//        //May be two usages related to the same state. This is abstractState !
+//        //return;
+//      }
+//    }
+//  }
+
+  /**
+   * 重新修改上面的remove方法，上面的方法会报异常
+   * @param pUstate
+   */
+    public void remove(UsageState pUstate) {
+      for (Map.Entry<UsagePoint, UsageInfoSet> entry : usageInfoSets.entrySet()) {
+        UsageInfoSet uset = entry.getValue();
+        boolean b = uset.remove(pUstate);
+        if (b) {
+          if (uset.isEmpty()) {
+            usageInfoSets.remove(entry.getKey());
+          }
         }
-        //May be two usages related to the same state. This is abstractState !
-        //return;
       }
     }
-  }
 
   public Iterator<UsagePoint> getPointIterator() {
     return new TreeSet<>(topUsages).iterator();
@@ -125,7 +153,7 @@ public class UnrefinedUsagePointSet implements AbstractUsagePointSet {
     currentUsagePoint.getCoveredUsages().forEach(this::add);
   }
 
-  NavigableSet<UsagePoint> getTopUsages() {
+  public NavigableSet<UsagePoint> getTopUsages() {
     return topUsages;
   }
 }

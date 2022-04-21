@@ -20,19 +20,29 @@
 package my_lab;
 
 import com.google.common.base.Predicates;
+
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+
 import org.sosy_lab.common.io.MoreFiles;
 import org.sosy_lab.cpachecker.core.reachedset.ReachedSet;
 import org.sosy_lab.cpachecker.cpa.arg.ARGState;
 import org.sosy_lab.cpachecker.cpa.arg.ARGToDotWriter;
 import org.sosy_lab.cpachecker.cpa.arg.ARGUtils;
+import org.sosy_lab.cpachecker.cpa.usage.UsageInfo;
+import org.sosy_lab.cpachecker.cpa.usage.storage.UnrefinedUsagePointSet;
+import org.sosy_lab.cpachecker.cpa.usage.storage.UsageContainer;
+import org.sosy_lab.cpachecker.cpa.usage.storage.UsageInfoSet;
+import org.sosy_lab.cpachecker.cpa.usage.storage.UsagePoint;
 import org.sosy_lab.cpachecker.util.BiPredicates;
 import org.sosy_lab.cpachecker.util.Pair;
+import org.sosy_lab.cpachecker.util.identifiers.SingleIdentifier;
 
 /** This class provides some global static functions. */
 @SuppressWarnings("deprecation")
@@ -63,6 +73,35 @@ public class GlobalMethods {
           ARGState::getChildren,
           Predicates.alwaysTrue(),
           BiPredicates.pairIn(cexpStatePairs));
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  /**
+   *
+   * @param unrefinedIds
+   */
+  public static void printUsagesInfo(String pFileName, final NavigableMap<SingleIdentifier, UnrefinedUsagePointSet> unrefinedIds) {
+    assert unrefinedIds != null && pFileName != null;
+    Set<Map.Entry<SingleIdentifier, UnrefinedUsagePointSet>> usagesInfo = unrefinedIds.entrySet();
+    Iterator<Map.Entry<SingleIdentifier, UnrefinedUsagePointSet>> it = usagesInfo.iterator();
+
+    try (Writer w = new FileWriter(pFileName, Charset.defaultCharset())) {
+      while (it.hasNext()) {
+        Map.Entry<SingleIdentifier, UnrefinedUsagePointSet> currentId = it.next();
+        String variableName = currentId.getKey().toString();
+        UnrefinedUsagePointSet currentInfoSet = currentId.getValue();
+        NavigableSet<UsagePoint> topUsages = currentInfoSet.getTopUsages();
+        String topUsagesStr = "";
+        Iterator<UsagePoint> ite = topUsages.iterator();
+        int i = 0;
+        while (ite.hasNext()) { topUsagesStr += "\t"+ite.next().toString()+"\n"; i++; }
+        if (i > 1) {
+          w.write(variableName + "|---> " + topUsagesStr + "\n");
+          w.write("\n");
+        }
+      }
     } catch (IOException e) {
       e.printStackTrace();
     }

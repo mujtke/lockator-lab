@@ -56,6 +56,17 @@ public class PartitionedReachedSet extends DefaultReachedSet {
     partitionedReached.put(getPartitionKey(pState), pState);
   }
 
+  /**
+   * 将covered State放入reachedSet中，但是不会将其放入waitlist中去
+   * @param pState
+   * @param pPrecision
+   */
+  public void addButSkipWaitlist(AbstractState pState, Precision pPrecision) {
+    super.addButSkipWaitlist(pState, pPrecision);
+
+    partitionedReached.put(getPartitionKey(pState), pState);
+  }
+
   @Override
   public void remove(AbstractState pState) {
     super.remove(pState);
