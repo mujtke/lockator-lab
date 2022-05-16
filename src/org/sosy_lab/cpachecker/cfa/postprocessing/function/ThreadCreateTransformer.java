@@ -188,7 +188,7 @@ public class ThreadCreateTransformer {
               functionParameters, /* 函数参数，待执行函数的参数 */
               functionDeclaration); /* 函数声明 */
 
-      // 将thread_create语句变成了线程执行函数，例如thread1，的调用语句？
+      // 将thread_create语句变成了线程执行函数，例如thread1的调用语句？
       boolean isSelfParallel = fName.equals(threadCreateN);
       CFunctionCallStatement pFunctionCall =
           new CThreadCreateStatement(

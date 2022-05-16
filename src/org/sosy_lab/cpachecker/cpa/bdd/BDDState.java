@@ -12,6 +12,7 @@ import com.google.common.base.Joiner;
 
 import org.sosy_lab.cpachecker.core.defaults.LatticeAbstractState;
 import org.sosy_lab.cpachecker.core.interfaces.AbstractQueryableState;
+import org.sosy_lab.cpachecker.core.interfaces.Graphable;
 import org.sosy_lab.cpachecker.exceptions.CPAException;
 import org.sosy_lab.cpachecker.exceptions.InvalidQueryException;
 import org.sosy_lab.cpachecker.util.predicates.regions.NamedRegionManager;
@@ -21,7 +22,7 @@ import org.sosy_lab.java_smt.api.SolverException;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 public class BDDState implements AbstractQueryableState,
-    LatticeAbstractState<BDDState> {
+    LatticeAbstractState<BDDState>, Graphable {
 
   private Region currentState;
   private final NamedRegionManager manager;
@@ -163,5 +164,15 @@ public class BDDState implements AbstractQueryableState,
       return this;
     }
     return new BDDState(manager, bvmgr, manager.makeExists(currentState, toForget));
+  }
+
+  @Override
+  public String toDOTLabel() {
+    return "";
+  }
+
+  @Override
+  public boolean shouldBeHighlighted() {
+    return true;
   }
 }

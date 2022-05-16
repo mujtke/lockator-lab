@@ -405,6 +405,7 @@ public class CPAchecker {
         stats.resultAnalysisTime.start();
 //        if (reached.hasViolatedProperties()) {
 //          violatedPropertyDescription = Joiner.on(", ").join(reached.getViolatedProperties());
+        //TODO: 后面可能这里需要修改
         // 这里修改一下获取违反的属性的方式
           if (((Plan_C_UsageReachedSet)reached).haveUnsafes()) {
             violatedPropertyDescription = Joiner.on(", ").join(((Plan_C_UsageReachedSet) reached).getUnsafesProperties());

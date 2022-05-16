@@ -57,6 +57,11 @@ public class ThreadTransferRelation implements TransferRelation {
     threadStatistics = new ThreadCPAStatistics();
   }
 
+  /* for debug */
+  public ThreadTransferRelation() {
+    threadStatistics = new ThreadCPAStatistics();
+  }
+
   @Override
   public Collection<? extends AbstractState> getAbstractSuccessorsForEdge(AbstractState pState,
       Precision pPrecision, CFAEdge pCfaEdge) throws CPATransferException, InterruptedException {

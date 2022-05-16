@@ -32,23 +32,33 @@ public class Plan_C_threadingStopOperator implements StopOperator {
     @Override
     public boolean stop(AbstractState state, Collection<AbstractState> reached, Precision precision) throws CPAException, InterruptedException {
 
+        // TODO: debug 0510
+        //if (true) return true;
         assert state instanceof Plan_C_threadingState;
 
-        boolean shouldStop = true;
+        boolean stop = true;
+//        boolean locationStop = true;
         Plan_C_threadingState pState = (Plan_C_threadingState) state;
-        Iterable<CFANode> Locs = pState.getLocationNodes();
-        Iterator<CFANode> it = Locs.iterator();
-        while (it.hasNext()) {
-            CFANode p = it.next();
-            if (!Plan_C_UsageReachedSet.visitedLocations.contains(p)) {
-                shouldStop = false;
-                break;
+//        Iterable<CFANode> Locs = pState.getLocationNodes();
+//        Iterator<CFANode> it = Locs.iterator();
+//        while (it.hasNext()) {
+//            CFANode p = it.next();
+//            if (!Plan_C_UsageReachedSet.visitedLocations.contains(p)) {
+//                locationStop = false;
+//                break;
+//            }
+//        }
+//        if (locationStop) {   // 如果Location覆盖，则将该usageState的locationCovered设置为true
+//            pState.locationCovered = true;
+//        }
+        // TODO: cover比较的是当前状态和reached中的状态
+        for (AbstractState other : reached) {
+            Plan_C_threadingState o = (Plan_C_threadingState) other;
+            if (!pState.currentThread.equals(o.currentThread) || !pState.threadSet.equals(o.threadSet)) {
+                stop = false;
             }
         }
-        if (shouldStop) {   // 如果Location覆盖，则将该usageState的locationCovered设置为true
-            pState.locationCovered = true;
-        }
 
-        return shouldStop;
+        return stop;
     }
 }

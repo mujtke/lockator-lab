@@ -47,6 +47,7 @@ import org.sosy_lab.cpachecker.core.interfaces.Precision;
 import org.sosy_lab.cpachecker.core.interfaces.TransferRelation;
 import org.sosy_lab.cpachecker.core.interfaces.WrapperTransferRelation;
 import org.sosy_lab.cpachecker.cpa.ThreadingForPlanC.Plan_C_threadingState;
+import org.sosy_lab.cpachecker.cpa.arg.ARGState;
 import org.sosy_lab.cpachecker.cpa.callstack.CallstackState;
 import org.sosy_lab.cpachecker.cpa.callstack.CallstackTransferRelation;
 import org.sosy_lab.cpachecker.cpa.composite.CompositeState;
@@ -158,33 +159,61 @@ public class Plan_C_UsageTransferRelation extends AbstractSingleWrapperTransferR
             Collection<AbstractState> successors = ImmutableList.copyOf(transferRelation.getAbstractSuccessors(wrappedState, pPrecision));
 
             // 遗漏了将compositeState转换为UsageState的过程
-            List<CFAEdge> edges = new ArrayList<>();
+            Set<CFAEdge> edges = new HashSet<>();
             Set<CFANode> locsBefore = new HashSet<>();  // 传入状态中所包含的location集合
             for (CFANode node : locStateBefore.getLocationNodes()) { locsBefore.add(node); }
-            for (AbstractState state : successors) {
+            for (AbstractState state : successors) {    // 对每个后继先计算边，再利用边将状态转换成usageState
                 CompositeState newState = (CompositeState) state;
                 AbstractStateWithLocations locStateAfter = extractStateByType(newState, AbstractStateWithLocations.class);
                 Set<CFANode> locsAfter = new HashSet<>();   // 新获取的状态中所包含的location集合
                 for (CFANode node : locStateAfter.getLocationNodes()) { locsAfter.add(node); }
                 locsAfter.removeAll(locsBefore);
-                for (CFANode node : locsAfter) {    // 将产生的新后继的状态所对应的边都加到edges中
+                for (CFANode node : locsAfter) {    // 将产生的新后继的状态所对应的边都加到edges中（按道理，一个状态只对应一条边才对）
                     for (int i = 0; i < node.getNumEnteringEdges(); i++) { edges.add(node.getEnteringEdge(i)); }
                 }
-            }
 
-            Set<AbstractState> usageStates = new HashSet<>();
-            statistics.bindingTimer.start();
-            for (CFAEdge edge : edges) {
-                creator.setCurrentFunction(getCurrentFunction((UsageState) pElement, edge));
-                UsageState oldState = (UsageState) pElement;    // oldState对应传入的旧状态
-                usageStates.addAll(handleEdge(edge, successors, oldState));
+                Set<AbstractState> usageStates = new HashSet<>();
+                statistics.bindingTimer.start();
+                for (CFAEdge edge : edges) {
+
+                    statistics.checkForSkipTimer.start();
+                    CFAEdge currentEdge = changeIfNeccessary(edge); //如果pCfaEdge的调用了abort函数或者skipped函数，则返回空边或者summary边（相当于跳过函数分析）
+                    statistics.checkForSkipTimer.stop();
+                    if (currentEdge == null) { // 如果调用了abort函数，则后继状态为空集
+                        continue;
+                    }
+
+                    creator.setCurrentFunction(getCurrentFunction((UsageState) pElement, currentEdge));
+                    UsageState oldState = (UsageState) pElement;    // oldState对应传入的旧状态
+//                    usageStates.addAll(handleEdge(currentEdge, successors, oldState));
+                    Collection<AbstractState> successorsNew = new ArrayList<>();
+                    successorsNew.add(state);
+
+                    usageStates.addAll(handleEdge(currentEdge, successorsNew, oldState));
+                }
+                statistics.bindingTimer.stop();
+                for (AbstractState uState : usageStates) {
+                    results.add(uState);
+                }
+//                results = ImmutableList.copyOf(usageStates);
+                edges.clear();
             }
-            statistics.bindingTimer.stop();
-            results = ImmutableList.copyOf(usageStates);
         }
 
         statistics.transferRelationTimer.stop();
         return results;
+    }
+
+    /** 更新usageState的线程集合 */
+    private void updateThreadSet(CFAEdge currentEdge, AbstractState precessor) {
+       for (ARGState pp : ((ARGState)precessor).getParents()) {
+           // 遍历precessor的所有前驱边来
+       }
+       if (currentEdge.getEdgeType() == CFAEdgeType.BlankEdge) {
+           // 如果为空边，判断是前驱迁移是否是线程创建边
+
+
+       }
     }
 
     private Collection<? extends AbstractState>
@@ -330,8 +359,8 @@ public class Plan_C_UsageTransferRelation extends AbstractSingleWrapperTransferR
                 }
 
                 // Do not know why, but replacing the loop into lambda greatly decreases the speed
-                for (AbstractState newWrappedState : newWrappedStates) {  //这里的WrappedState是compositeState，WrappedStates是WrappedStates的数组
-                    UsageState newState = oldState.copy(newWrappedState);   //其实是求WrappedStates的后继状态（有多个）？
+                for (AbstractState newWrappedState : newWrappedStates) {  //这里的WrappedState是compositeState，WrappedStates是WrappedState的数组
+                    UsageState newState = oldState.copy(newWrappedState);
 
                     if (!newLinks.isEmpty()) {
                         newState = newState.put(newLinks);

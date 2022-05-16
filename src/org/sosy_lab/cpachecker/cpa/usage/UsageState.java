@@ -23,6 +23,7 @@ import org.sosy_lab.cpachecker.core.defaults.LatticeAbstractState;
 import org.sosy_lab.cpachecker.core.interfaces.AbstractEdge;
 import org.sosy_lab.cpachecker.core.interfaces.AbstractState;
 import org.sosy_lab.cpachecker.core.interfaces.AbstractStateWithEdge;
+import org.sosy_lab.cpachecker.core.interfaces.Graphable;
 import org.sosy_lab.cpachecker.util.AbstractStates;
 import org.sosy_lab.cpachecker.util.Pair;
 import org.sosy_lab.cpachecker.util.identifiers.AbstractIdentifier;
@@ -35,7 +36,7 @@ import org.sosy_lab.cpachecker.util.statistics.StatisticsWriter;
 
 /** Represents one abstract state of the Usage CPA. */
 public class UsageState extends AbstractSingleWrapperState
-    implements LatticeAbstractState<UsageState>, AbstractStateWithEdge, AliasInfoProvider {
+    implements LatticeAbstractState<UsageState>, AbstractStateWithEdge, AliasInfoProvider, Graphable {
   /* Boilerplate code to avoid serializing this class */
 
   private static final long serialVersionUID = -898577877284268426L;
@@ -294,6 +295,16 @@ public class UsageState extends AbstractSingleWrapperState
 
   public StateStatistics getStatistics() {
     return stats;
+  }
+
+  @Override
+  public String toDOTLabel() {
+    return this.getWrappedState() instanceof Graphable ? ((Graphable)this.getWrappedState()).toDOTLabel() : "";
+  }
+
+  @Override
+  public boolean shouldBeHighlighted() {
+    return this.getWrappedState() instanceof Graphable ? ((Graphable)this.getWrappedState()).shouldBeHighlighted() :  false;
   }
 
   public static class StateStatistics {

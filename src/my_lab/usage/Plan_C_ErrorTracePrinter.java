@@ -219,6 +219,8 @@ public abstract class Plan_C_ErrorTracePrinter {
         for (Entry<SingleIdentifier, Pair<UsageInfo, UsageInfo>> unsafe : unsafes.entrySet()) {
             if (unsafe.getValue() == null || unsafe.getValue().getFirst() == null || unsafe.getValue().getSecond() == null) {
                 System.out.println("");
+                // TODO: debug 0510
+                continue;
             }
             UsageInfo uinfo1 = unsafe.getValue().getFirst();
             UsageInfo uinfo2 = unsafe.getValue().getSecond();

@@ -11,6 +11,7 @@ package my_lab.algorithm;
 import static com.google.common.base.Verify.verifyNotNull;
 import static com.google.common.collect.FluentIterable.from;
 import static my_lab.GlobalMethods.exportARG;
+import static my_lab.GlobalMethods.printUsagesInfo;
 import static org.sosy_lab.cpachecker.util.AbstractStates.extractStateByType;
 
 import java.io.PrintStream;
@@ -138,7 +139,7 @@ public class Plan_C_Algorithm implements Algorithm, StatisticsProvider, ReachedS
                 raceFound = false;
                 // run algorithm
                 // debug
-                System.out.println("get successors in iteration" + iteration++); if (iteration > 1000) { break; }
+//                System.out.println("get successors in iteration" + iteration++); if (iteration > 1000) { break; }
 
                 status = status.update(algorithm.run(reached));     // 更新可达集，不会探索完全，每轮探索一个状态的后继
                 if (((Plan_C_UsageReachedSet)reached).newSuccessorsInEachIteration.isEmpty()) {  // 新的一轮计算中没有产生后继状态
@@ -146,19 +147,20 @@ public class Plan_C_Algorithm implements Algorithm, StatisticsProvider, ReachedS
                         continue;                         // 直接进入下一轮计算
                     }
                     if (!reached.hasWaitingState()) {   // 若可达图探索完成
-                        System.out.println("reachable graph's exploration finished");
+                        //System.out.println("reachable graph's exploration finished");
 
                         if (((Plan_C_UsageReachedSet) reached).isStillHaveCoveredStates()) {    // 如果还有被cover的状态，则搜索还应该继续
 
-                            { // 重新开始计算之前，打印一些之前的ARG
-                                if (dotFileIndex > 5) {
-                                    break;
-                                }
-                                exportARG(reached, "./output/thread_test/debug/_" + (dotFileIndex++) + "_.dot");
-                            }
+                           // { // 重新开始计算之前，打印一些之前的ARG
+                           //     if (dotFileIndex > 5) {
+                           //         break;
+                           //     }
+                           //     exportARG(reached, "./output/thread_test/debug/_" + (dotFileIndex++) + "_.dot");
+                           // }
                             /* 对cover状态的处理 */
                             /* 先将cover状态全部放回到waitlist中 */
                             ((Plan_C_UsageReachedSet)reached).rollbackCoveredStates();
+                            continue;
 
                         }
                         else {                                                  // 没有被cover的状态
@@ -168,17 +170,10 @@ public class Plan_C_Algorithm implements Algorithm, StatisticsProvider, ReachedS
                 }
 
                 notifyReachedSetUpdateListeners(reached);
-
                 if (haveUnsafeOrNot(reached) == true) {                         // 如果发现了race
-                    System.out.println("race found");
-
-//                    {// 打印一下unrefinedIds
-//                      printUsagesInfo("./output/thread_test/debug/" + (usagePairFileIndex++) + ".txt", ((UsageReachedSet) reached).getUsageContainer().getUnrefinedIds());
-//                      System.out.println(((UsageReachedSet) reached).getUnsafes().toString()+"\n");
-//                    }
+                    //System.out.println("race found");
                     ((Plan_C_UsageReachedSet) reached).setHaveUnsafes(true);           // 将可达集合含有不安全设置为true
                     break;
-
                 }
 
                 // 将新产生的后继中的Location存放到visitedLocations中
@@ -202,10 +197,11 @@ public class Plan_C_Algorithm implements Algorithm, StatisticsProvider, ReachedS
         } finally {
             stats.totalTimer.stop();
             // 打印一下CEGAR算法的总时间
-            System.out.println("Total time for CEGAR algorithm:   " + stats.totalTimer);
+            //System.out.println("Total time for CEGAR algorithm:   " + stats.totalTimer);
+            //System.out.println("reached.size:  " + reached.size());
 
             // 打印一下threading对应的ARG
-            exportARG(reached, "./output/thread_test/debug/_" + "thread16_.dot");
+            //exportARG(reached, "./output/thread_test/debug/_" + "thread16_.dot");
 
         }
         return status;

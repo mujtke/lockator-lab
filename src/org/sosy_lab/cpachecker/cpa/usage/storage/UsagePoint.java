@@ -75,6 +75,12 @@ public final class UsagePoint implements Comparable<UsagePoint> {
 
   @Override
   public int compareTo(UsagePoint o) {
+    // TODO: debug 0516
+    final boolean DEBUG = false;
+    if (DEBUG) {
+      // 如果默认都不相同的话
+      return 1;
+    }
     //It is very important to compare at first the accesses, because an algorithm base on this suggestion
     int result = access.compareTo(o.access);
     if (result != 0) {

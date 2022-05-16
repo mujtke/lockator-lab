@@ -54,8 +54,8 @@ import org.sosy_lab.cpachecker.exceptions.UnrecognizedCodeException;
 import org.sosy_lab.cpachecker.util.AbstractStates;
 import org.sosy_lab.cpachecker.util.automaton.AutomatonGraphmlCommon.KeyDef;
 
-@Options(prefix="cpa.threading")
-public final class Plan_C_threadingTransferRelatoin extends SingleEdgeTransferRelation {
+@Options(prefix="cpa.ThreadingForPlanC")
+public final class Plan_C_threadingTransferRelation extends SingleEdgeTransferRelation {
 
 
     @Option(description="do not use the original functions from the CFA, but cloned ones. "
@@ -112,7 +112,7 @@ public final class Plan_C_threadingTransferRelatoin extends SingleEdgeTransferRe
 
     private final GlobalAccessChecker globalAccessChecker = new GlobalAccessChecker();
 
-    public Plan_C_threadingTransferRelatoin(Configuration pConfig, CFA pCfa, LogManager pLogger)
+    public Plan_C_threadingTransferRelation(Configuration pConfig, CFA pCfa, LogManager pLogger)
             throws InvalidConfigurationException {
         pConfig.inject(this);
         cfa = pCfa;
@@ -161,6 +161,16 @@ public final class Plan_C_threadingTransferRelatoin extends SingleEdgeTransferRe
                 activeThread, threadingState, precision, cfaEdge);
 
         results = getAbstractSuccessorsForEdge0(cfaEdge, threadingState, activeThread, results);
+
+        // TODO:对所有的result而言，应该将前驱状态的threadSet先继承下来
+        //Collections2.transform(results, ts -> ts.withOldThreadSet(state));
+
+        // TODO:试图更新results的ThreadSet信息
+        /* TODO:结果不正确, 0506：尝试在Plan_C_UsageTransferRelation中进行threadSet的更新，这里只更新currentThread */
+        //results = Collections2.transform(results, ts -> ts.withThreadSet(activeThread, cfaEdge));
+
+        // TODO: 将threads信息简化到threadSet中
+        results = Collections2.transform(results, ts -> ts.copyThreads());
 
         // Store the active thread in the given states, cf. JavaDoc of activeThread
         results = Collections2.transform(results, ts -> ts.withActiveThread(activeThread));
@@ -284,11 +294,11 @@ public final class Plan_C_threadingTransferRelatoin extends SingleEdgeTransferRe
             String activeThread, Plan_C_threadingState threadingState, Precision precision, CFAEdge cfaEdge)
             throws CPATransferException, InterruptedException {
 
-        // compute new locations
+        // compute new locations  根据相应的边计算新的位置
         Collection<? extends AbstractState> newLocs = locationCPA.getTransferRelation().
                 getAbstractSuccessorsForEdge(threadingState.getThreadLocation(activeThread), precision, cfaEdge);
 
-        // compute new stacks
+        // compute new stacks    根据相应的边计算新的调用栈
         Collection<? extends AbstractState> newStacks = callstackCPA.getTransferRelation().
                 getAbstractSuccessorsForEdge(threadingState.getThreadCallstack(activeThread), precision, cfaEdge);
 
@@ -296,6 +306,7 @@ public final class Plan_C_threadingTransferRelatoin extends SingleEdgeTransferRe
         final Collection<Plan_C_threadingState> results = new ArrayList<>();
         for (AbstractState loc : newLocs) {
             for (AbstractState stack : newStacks) {
+                /* 对于当前线程来说，Location和Stack最多应该各只有一个 */
                 results.add(threadingState.updateLocationAndCopy(activeThread, stack, loc));
             }
         }
@@ -348,7 +359,7 @@ public final class Plan_C_threadingTransferRelatoin extends SingleEdgeTransferRe
         for (String id : tmp.getThreadIds()) {
             if (isLastNodeOfThread(tmp.getThreadLocation(id).getLocationNode())) {
                 tmp = removeThreadId(tmp, id);
-                tmp = removeThreadStatusForExit(tmp, id);
+//                tmp = removeThreadStatusForExit(tmp, id);   // TODO：不确定
             }
         }
         return tmp;
@@ -359,12 +370,12 @@ public final class Plan_C_threadingTransferRelatoin extends SingleEdgeTransferRe
      * @param id 已经到达最后一个节点的线程的id
      * @return 返回tmp， 如果tmp的线程集合中含有id的话，则将其去除
      */
-    private Plan_C_threadingState removeThreadStatusForExit(Plan_C_threadingState tmp, String id) {
-        if (tmp.getThreadSet().containsKey(id)) {
-            tmp.getThreadSet().remove(id);
-        }
-        return tmp;
-    }
+//    private Plan_C_threadingState removeThreadStatusForExit(Plan_C_threadingState tmp, String id) {
+//        if (tmp.getThreadSet().containsKey(id)) {
+//            tmp.getThreadSet().remove(id);
+//        }
+//        return tmp;
+//    }
 
     /** remove the thread-id from the state, and cleanup remaining locks of this thread. */
     private Plan_C_threadingState removeThreadId(Plan_C_threadingState ts, final String id) {
@@ -472,7 +483,7 @@ public final class Plan_C_threadingTransferRelatoin extends SingleEdgeTransferRe
             /**
              * 参照ThreadState修改threadingState中的相关信息
              */
-            threadingState = handleThreadStatus(threadingState, threadId);
+            //threadingState = handleThreadSet(threadingState, threadId);
 
             return threadingState;
         } else {
@@ -481,47 +492,40 @@ public final class Plan_C_threadingTransferRelatoin extends SingleEdgeTransferRe
             return null;
         }
     }
+    /** 更新线程集合 */
+    private Plan_C_threadingState handleThreadSet(Plan_C_threadingState threadingState, String threadId) {
 
-    /** 参照ThreadTransferRelation中的内容
-     * @param threadingState
-     * @param threadId
-     * @return pthread_create(t1)语句在所在线程的后继，其线程集合中，t1的状态应该为Parent_thread，线程t1中的后继，其线程集合中t1的状态应该为Created_thread
-     */
-    private Plan_C_threadingState handleThreadStatus(Plan_C_threadingState threadingState, String threadId) {
-        if (threadingState.getActiveThread() != null) {
-            return createThread(threadingState, threadId, Plan_C_threadingState.ThreadStatus.PARENT_THREAD);
-        }
-        return createThread(threadingState, threadId, Plan_C_threadingState.ThreadStatus.CREATED_THREAD);
+        return null;
     }
 
-    private Plan_C_threadingState createThread(Plan_C_threadingState threadingState, String threadId, Plan_C_threadingState.ThreadStatus threadStatus) {
-//        final String threadNameWithoutNum= threadId.replaceAll("\\d+", "");
-        Map<String, Plan_C_threadingState.ThreadStatus> tSet = threadingState.getThreadSet();
-
-        // thread Status depends on parameter threadStatus and tSet
-        Plan_C_threadingState.ThreadStatus status = threadStatus;
-        if (tSet.containsKey(threadId)) {   // if the threadName has already existed once
-            /* self_parallel_thread */
-        }
-
-        if (!tSet.isEmpty()) {
-            if (tSet.get(threadingState.getCurrentThread()) == Plan_C_threadingState.ThreadStatus.SELF_PARALLEL_THREAD) {
-                status = Plan_C_threadingState.ThreadStatus.SELF_PARALLEL_THREAD;
-            }
-        }
-
-        Map<String, Plan_C_threadingState.ThreadStatus> newSet = new TreeMap<>(tSet);
-        newSet.put(threadId, status);
-
-        // set current Thread
-        String currentThread;
-        if (threadStatus == Plan_C_threadingState.ThreadStatus.PARENT_THREAD) {
-            currentThread = threadingState.getCurrentThread();
-        } else {
-            currentThread = threadId;
-        }
-        return threadingState.copyWith(currentThread, newSet);
-    }
+//    private Plan_C_threadingState createThread(Plan_C_threadingState threadingState, String threadId, Plan_C_threadingState.ThreadStatus threadStatus) {
+////        final String threadNameWithoutNum= threadId.replaceAll("\\d+", "");
+//        Map<String, Plan_C_threadingState.ThreadStatus> tSet = threadingState.getThreadSet();
+//
+//        // thread Status depends on parameter threadStatus and tSet
+//        Plan_C_threadingState.ThreadStatus status = threadStatus;
+//        if (tSet.containsKey(threadId)) {   // if the threadName has already existed once
+//            /* self_parallel_thread */
+//        }
+//
+//        if (!tSet.isEmpty()) {
+//            if (tSet.get(threadingState.getCurrentThread()) == Plan_C_threadingState.ThreadStatus.SELF_PARALLEL_THREAD) {
+//                status = Plan_C_threadingState.ThreadStatus.SELF_PARALLEL_THREAD;
+//            }
+//        }
+//
+//        Map<String, Plan_C_threadingState.ThreadStatus> newSet = new TreeMap<>(tSet);
+//        newSet.put(threadId, status);
+//
+//        // set current Thread
+//        String currentThread;
+//        if (threadStatus == Plan_C_threadingState.ThreadStatus.PARENT_THREAD) {
+//            currentThread = threadingState.getCurrentThread();
+//        } else {
+//            currentThread = threadId;
+//        }
+//        return threadingState.copyWith(currentThread, newSet);
+//    }
 
     /** returns the threadId if possible, else the next indexed threadId. */
     private String getNewThreadId(final Plan_C_threadingState threadingState, final String threadId) throws UnrecognizedCodeException {
@@ -603,20 +607,20 @@ public final class Plan_C_threadingTransferRelatoin extends SingleEdgeTransferRe
          * 这里对返回的结果进行修改，参照ThreadTransferRelation中的joinThread方式
          * 不确定
          */
-        removeThreadStatusForJoin(results, extractParamName(statement, 0));
+        //removeThreadStatusForJoin(results, extractParamName(statement, 0));
 
         return results;
     }
 
-    private void removeThreadStatusForJoin(Collection<Plan_C_threadingState> results, String s) {
-        Iterator<Plan_C_threadingState> it = results.iterator();
-        while(it.hasNext()) {
-            Map<String, Plan_C_threadingState.ThreadStatus> tMap = it.next().getThreadSet();
-            if (tMap.containsKey(s)) {    // join之后，join的线程应该在所有状态的线程集合中抹去(TODO:不确定)
-                tMap.remove(s);
-            }
-        }
-    }
+//    private void removeThreadStatusForJoin(Collection<Plan_C_threadingState> results, String s) {
+//        Iterator<Plan_C_threadingState> it = results.iterator();
+//        while(it.hasNext()) {
+//            Map<String, Plan_C_threadingState.ThreadStatus> tMap = it.next().getThreadSet();
+//            if (tMap.containsKey(s)) {    // join之后，join的线程应该在所有状态的线程集合中抹去(TODO:不确定)
+//                tMap.remove(s);
+//            }
+//        }
+//    }
 
     /** extract the name of the n-th parameter from a function call. */
     static String extractParamName(AStatement statement, int n) throws UnrecognizedCodeException {
@@ -734,7 +738,7 @@ public final class Plan_C_threadingTransferRelatoin extends SingleEdgeTransferRe
                         ((AFunctionCall) statement).getFunctionCallExpression().getFunctionNameExpression();
                 if (functionNameExp instanceof AIdExpression) {
                     final String functionName = ((AIdExpression) functionNameExp).getName();
-                    if (org.sosy_lab.cpachecker.cpa.ThreadingForPlanC.Plan_C_threadingTransferRelatoin.THREAD_START.equals(functionName)) {
+                    if (Plan_C_threadingTransferRelation.THREAD_START.equals(functionName)) {
                         List<? extends AExpression> params =
                                 ((AFunctionCall) statement).getFunctionCallExpression().getParameterExpressions();
                         if (!(params.get(2) instanceof CUnaryExpression)) {

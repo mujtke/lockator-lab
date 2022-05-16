@@ -12,11 +12,10 @@ import static org.sosy_lab.cpachecker.cpa.thread.ThreadTransferRelation.isThread
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import java.util.Iterator;
-import java.util.Map;
+
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Objects;
-import java.util.TreeMap;
+
 import org.sosy_lab.cpachecker.cfa.ast.c.CFunctionCall;
 import org.sosy_lab.cpachecker.cfa.ast.c.CThreadOperationStatement.CThreadCreateStatement;
 import org.sosy_lab.cpachecker.cfa.model.CFAEdge;
@@ -53,6 +52,13 @@ public class ThreadState
     threadSet = Tset;
     removedSet = Rset;
     currentThread = pCurrent;
+  }
+
+  // TODO:测试使用
+  public ThreadState(String pCurrent) {
+    currentThread = pCurrent;
+    threadSet = new HashMap<>();
+    removedSet = null;
   }
 
   @Override

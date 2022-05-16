@@ -51,10 +51,12 @@ public class Plan_C_UnsafeDetector {
             return ((RefinedUsagePointSet)set).getUnsafePair();
         } else {
             UnrefinedUsagePointSet unrefinedSet = (UnrefinedUsagePointSet) set;
+            // TODO: debug 0516 这里有问题：存在result中的某个Point在unrefinedSet.getTopUsages中找不到的情况，但实际上result是从unrefinedSet.getTopUsages中取出来的，也就是说应该都存在才对
             Pair<UsagePoint, UsagePoint> result = getUnsafePair(unrefinedSet.getTopUsages());
 
             assert result != null;
-            Pair<UsageInfo, UsageInfo> pair = null;     // for debug
+            // TODO: debug 0511
+            Pair<UsageInfo, UsageInfo> pair = null;
             try {
                 if (unrefinedSet.getUsageInfo(result.getFirst()) == null) {
                     System.out.println("");
@@ -65,6 +67,13 @@ public class Plan_C_UnsafeDetector {
             } catch (NullPointerException e) {
                 System.out.println("null PointerException");
             } finally {
+                // TODO: debug 0516
+                final boolean DEBUG = false;
+                if (DEBUG) {
+                    for (UsagePoint point : unrefinedSet.getTopUsages()) {
+                        System.out.println("\t\u001b[31mresult.getFirst(): \u001b[0m" + result.getFirst() + "\n \t\u001b[31musage in TopUsages: \u001b[0m" + point + "\n\t\u001b[32mcompare: " + result.getFirst().compareTo(point) + "\u001b[0m");
+                    }
+                }
                 return pair;
             }
 
@@ -90,15 +99,19 @@ public class Plan_C_UnsafeDetector {
         for (UsagePoint point1 : set) {
             // Operation is not commutative, not to optimize
             for (UsagePoint point2 : set) {
+                if (point1.equals(point2)) continue; // TODO: debug 0516
                 if (isUnsafePair(point1, point2)) {
                     Pair<UsagePoint, UsagePoint> newUnsafePair = Pair.of(point1, point2);
                     if (unsafePair == null || compare(newUnsafePair, unsafePair) < 0) {
                         unsafePair = newUnsafePair;
+                        break;  // TODO: debug 0516
                     }
                 }
             }
         }
         // If we can not find an unsafe here, fail
+        // TODO: debug 5016
+        assert unsafePair != null: "\u001b[31mFailed\u001b[0m\n";
         return unsafePair;
     }
 

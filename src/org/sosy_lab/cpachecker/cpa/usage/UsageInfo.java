@@ -9,12 +9,20 @@
 package org.sosy_lab.cpachecker.cpa.usage;
 
 import com.google.common.collect.ImmutableList;
+
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.sosy_lab.cpachecker.cfa.model.CFAEdge;
 import org.sosy_lab.cpachecker.cfa.model.CFANode;
 import org.sosy_lab.cpachecker.core.interfaces.AbstractState;
+import org.sosy_lab.cpachecker.core.interfaces.AbstractStateWithLocations;
+import org.sosy_lab.cpachecker.core.interfaces.AbstractWrapperState;
+import org.sosy_lab.cpachecker.cpa.ThreadingForPlanC.Plan_C_threadingState;
+import org.sosy_lab.cpachecker.cpa.arg.ARGState;
 import org.sosy_lab.cpachecker.cpa.lock.AbstractLockState;
 import org.sosy_lab.cpachecker.cpa.lock.LockState.LockTreeNode;
 import org.sosy_lab.cpachecker.cpa.usage.storage.UsageDelta;
@@ -85,12 +93,33 @@ public final class UsageInfo implements Comparable<UsageInfo> {
         }
         storedStates.add(s.getCompatibleNode());  // 只添加ThreadState和LockState
       }
-      UsageInfo result =
-          new UsageInfo(
-              atype,
-              AbstractStates.extractLocation(state),
-              (SingleIdentifier) ident,
-              storedStates.build());
+
+      /**
+       * new UsageInfo中，需要传入当前边所对应的CFANode，不使用LocationCPA时，传入的CFANode为null
+       * 修改使其能够正常传入
+       */
+      AbstractStateWithLocations childStateWithLocs = AbstractStates.extractStateByType(state, Plan_C_threadingState.class);
+      CFANode node = null;
+      Set<CFANode> childLocs = new HashSet<>();
+      for (CFANode n : childStateWithLocs.getLocationNodes()) { childLocs.add(n); }
+      for (ARGState s : ((ARGState)state).getParents()) {
+        AbstractStateWithLocations parentStateWithLocs = AbstractStates.extractStateByType(s, Plan_C_threadingState.class);
+        Set<CFANode> parentLocs = new HashSet<>();
+        for (CFANode n : parentStateWithLocs.getLocationNodes()) { parentLocs.add(n); }
+        childLocs.removeAll(parentLocs);
+        if (!childLocs.isEmpty()) {
+          assert childLocs.size() == 1 : "get location error";
+          node = (CFANode)childLocs.toArray()[0];
+        }
+      }
+      assert node != null : "NullPoint exception found!";
+      UsageInfo result = new UsageInfo (atype, node, (SingleIdentifier) ident, storedStates.build());
+//      UsageInfo result =
+//          new UsageInfo(
+//              atype,
+//              AbstractStates.extractLocation(state),
+//              (SingleIdentifier) ident,
+//              storedStates.build());
       result.core.keyState = state;
       return result;
     }
@@ -171,8 +200,65 @@ public final class UsageInfo implements Comparable<UsageInfo> {
     return core.path;
   }
 
-  @Override
+  /**
+   * 这个实现的方法中，即便两个usageInfo的keyState不相同，两个UsageInfo也有可能被认定为相同
+   * 原作者认为treeMap难以理解... -> 没有使用keyState作为比较的依据
+   * @param pO
+   * @return
+   */
+//  @Override
+//  public int compareTo(UsageInfo pO) {
+//    // TODO: debug 0513
+//    final boolean DEBUG = false;
+//    if (DEBUG) {
+//      String id = pO.getId().getName();
+//      if (id.equals("b")) {
+//        System.out.println("\u001b[32m \u2460");
+//      }
+//    }
+//
+//    int result;
+//
+//    if (this == pO) {
+//      return 0;
+//    }
+//    result = point.compareTo(pO.point);
+//    if (result != 0) {
+//      return result;
+//    }
+//
+//    result = this.core.node.compareTo(pO.core.node);
+//    if (result != 0) {
+//      return result;
+//    }
+//    result = this.core.accessType.compareTo(pO.core.accessType);
+//    if (result != 0) {
+//      return result;
+//    }
+//    /* We can't use key states for ordering, because the treeSets can't understand,
+//     * that old refined usage with zero key state is the same as new one
+//     */
+//    if (this.core.id != null && pO.core.id != null) {
+//      // Identifiers may not be equal here:
+//      // if (a.b > c.b)
+//      // FieldIdentifiers are the same (when we add to container),
+//      // but full identifiers (here) are not equal
+//      // TODO should we distinguish them?
+//
+//    }
+//    return 0;
+//  }
+
   public int compareTo(UsageInfo pO) {
+    // remove 0513
+    final boolean DEBUG = false;
+    if (DEBUG) {
+      String id = pO.getId().getName();
+      if (id.equals("b")) {
+        System.out.println("\u001b[32m \u2460\u001b[0m");
+      }
+    }
+
     int result;
 
     if (this == pO) {
@@ -191,9 +277,14 @@ public final class UsageInfo implements Comparable<UsageInfo> {
     if (result != 0) {
       return result;
     }
-    /* We can't use key states for ordering, because the treeSets can't understand,
-     * that old refined usage with zero key state is the same as new one
-     */
+    // TODO: debug 0513 -> 使用keyState的相关信息进行判断
+    ARGState t = (ARGState) this.getKeyState();
+    ARGState o = (ARGState) pO.getKeyState();
+    result = t.compareTo(o);
+    if (result != 0) {
+      return result;
+    }
+
     if (this.core.id != null && pO.core.id != null) {
       // Identifiers may not be equal here:
       // if (a.b > c.b)

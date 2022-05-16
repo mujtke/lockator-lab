@@ -18,10 +18,13 @@ import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.logging.Level;
 import org.sosy_lab.common.log.LogManager;
+import org.sosy_lab.cpachecker.core.interfaces.AbstractState;
+import org.sosy_lab.cpachecker.cpa.arg.ARGState;
 import org.sosy_lab.cpachecker.cpa.usage.UsageInfo;
 import org.sosy_lab.cpachecker.cpa.usage.UsageState;
 import org.sosy_lab.cpachecker.cpa.usage.refinement.RefinementResult;
 import org.sosy_lab.cpachecker.cpa.usage.storage.*;
+import org.sosy_lab.cpachecker.util.AbstractStates;
 import org.sosy_lab.cpachecker.util.Pair;
 import org.sosy_lab.cpachecker.util.identifiers.SingleIdentifier;
 import org.sosy_lab.cpachecker.util.identifiers.StructureIdentifier;
@@ -64,7 +67,10 @@ public class Plan_C_UsageContainer {
     private boolean oneTotalIteration = false;
 
     public Plan_C_UsageContainer(Plan_C_UsageConfiguration pConfig, LogManager l) {
-        unrefinedIds = new ConcurrentSkipListMap<>();
+        // TODO: debug 0516
+        //unrefinedIds = new ConcurrentSkipListMap<>();
+        unrefinedIds = new TreeMap<>();
+
         refinedIds = new TreeMap<>();
         haveUnsafesIds = new TreeMap<>();
         falseUnsafes = new TreeSet<>();
@@ -82,34 +88,67 @@ public class Plan_C_UsageContainer {
      * @param pUsage
      */
     public void add(UsageInfo pUsage) {
-        SingleIdentifier id = pUsage.getId();
-        if (id instanceof StructureIdentifier) {
-            id = ((StructureIdentifier) id).toStructureFieldIdentifier();
-        }
+        final boolean DEBUG = true;
+        if (!DEBUG) {
+            {
+                SingleIdentifier id = pUsage.getId();
+                if (id instanceof StructureIdentifier) {
+                    id = ((StructureIdentifier) id).toStructureFieldIdentifier();
+                }
 
-        UnrefinedUsagePointSet uset;
+                UnrefinedUsagePointSet uset;
 
-        // searchingInCachesTimer.start();
-        if (oneTotalIteration && !unrefinedIds.containsKey(id)) {
-            // searchingInCachesTimer.stop();
-            return;
-        }
+                // searchingInCachesTimer.start();
+                if (oneTotalIteration && !unrefinedIds.containsKey(id)) {
+                    // searchingInCachesTimer.stop();
+                    return;
+                }
 
-        if (!unrefinedIds.containsKey(id)) {
-            uset = new UnrefinedUsagePointSet();
-            // It is possible, that someone place the set after check
-            UnrefinedUsagePointSet present = unrefinedIds.putIfAbsent(id, uset);  // 如果id之前就对应了一个UnrefinedUsagePointSet集合，则present = null
-            if (present != null) {                                                // 否则present = 之前对应的UnrefinedUsagePointSet集合
-                uset = present;                                                     // 在此之前，uset为空
+                if (!unrefinedIds.containsKey(id)) {
+                    uset = new UnrefinedUsagePointSet();
+                    // It is possible, that someone place the set after check
+                    UnrefinedUsagePointSet present = unrefinedIds.putIfAbsent(id, uset);  // 如果id之前就对应了一个UnrefinedUsagePointSet集合，则present = null
+                    if (present != null) {                                                // 否则present = 之前对应的UnrefinedUsagePointSet集合
+                        uset = present;                                                     // 在此之前，uset为空
+                    }
+                } else {
+                    uset = unrefinedIds.get(id);
+                }
+                // searchingInCachesTimer.stop();
+
+                // addingToSetTimer.start();
+                uset.add(pUsage);         // 将UsageInfo放到对应id的UnrefinedUsagePointSet集合中，不过会pUsage是否被覆盖进行判断
+                // addingToSetTimer.stop();
             }
-        } else {
-            uset = unrefinedIds.get(id);
         }
-        // searchingInCachesTimer.stop();
+        else {
+            // TODO: debug 0513
+            {
+                SingleIdentifier id = pUsage.getId();
+                if (id instanceof StructureIdentifier) {
+                    id = ((StructureIdentifier) id).toStructureFieldIdentifier();
+                }
 
-        // addingToSetTimer.start();
-        uset.add(pUsage);         // 将UsageInfo放到对应id的UnrefinedUsagePointSet集合中，不过会pUsage是否被覆盖进行判断
-        // addingToSetTimer.stop();
+                UnrefinedUsagePointSet uset;
+
+                int usageInfoOld = -1, usageInfoInc = 0;
+                if (!unrefinedIds.containsKey(id)) {
+                    usageInfoOld = 0;
+                    uset = new UnrefinedUsagePointSet();
+                    // It is possible, that someone place the set after check
+                    unrefinedIds.put(id, uset);
+                    uset.add(pUsage);
+                    usageInfoInc = uset.size() - usageInfoOld;
+                } else {
+                    uset = unrefinedIds.get(id);
+                    usageInfoOld = uset.size();
+                    uset.add(pUsage);
+                    usageInfoInc = uset.size() - usageInfoOld;
+                }
+                assert usageInfoInc == 1 : "\u001b[31mError: \u001b[0m add usageInfo error!";
+            }
+        }
+
     }
 
     // 每次都要提取相应的信息
@@ -327,20 +366,55 @@ public class Plan_C_UsageContainer {
         }
 
 //        if (true) { return false; }        // for debug
+        // TODO: debug 0510
+        if (!stableUnsafes.isEmpty()) {
+            for (Map.Entry<SingleIdentifier, Pair<UsageInfo, UsageInfo>> entry : stableUnsafes.entrySet()) {
+                AbstractState s1 = entry.getValue().getFirstNotNull().getKeyState();
+                AbstractState s2 = entry.getValue().getSecondNotNull().getKeyState();
+                ARGState argS1 = AbstractStates.extractStateByType(s1, ARGState.class);
+                ARGState argS2 = AbstractStates.extractStateByType(s2, ARGState.class);
+                System.out.println("unsafe: " + argS1.getStateId() + ", " + argS2.getStateId());
+            }
+
+        }
         return !stableUnsafes.isEmpty();
     }
 
     private void findUnsafesIfExist() {
         unsafeDetectionTimer.start();
-
-        Iterator<Entry<SingleIdentifier, UnrefinedUsagePointSet>> iterator =
-                unrefinedIds.entrySet().iterator();             //
+        final boolean DEBUG = false;
+        if (!DEBUG) {
+            {
+                Iterator<Entry<SingleIdentifier, UnrefinedUsagePointSet>> iterator =
+                        unrefinedIds.entrySet().iterator();             //
 //    falseUnsafes = new TreeSet<>(unrefinedIds.keySet());    //先假设所有的id都为不安全
-        while (iterator.hasNext()) {
-            Entry<SingleIdentifier, UnrefinedUsagePointSet> entry = iterator.next();
-            UnrefinedUsagePointSet tmpList = entry.getValue();    //包含对特定id的topUsage和UsageInfoSets
-            if (detector.isUnsafe(tmpList)) {                     //若对某个id计算出存在不安全
-                haveUnsafesIds.put(entry.getKey(), entry.getValue()); //将该id添加到haveUnsafesIds中
+                while (iterator.hasNext()) {
+                    Entry<SingleIdentifier, UnrefinedUsagePointSet> entry = iterator.next();
+                    UnrefinedUsagePointSet tmpList = entry.getValue();    //包含对特定id的topUsage和UsageInfoSets
+                    if (detector.isUnsafe(tmpList)) {                     //若对某个id计算出存在不安全
+                        haveUnsafesIds.put(entry.getKey(), entry.getValue()); //将该id添加到haveUnsafesIds中
+                    }
+                }
+            }
+        }
+        else {  // TODO: debug 0513
+            {
+                Iterator<Entry<SingleIdentifier, UnrefinedUsagePointSet>> iterator = unrefinedIds.entrySet().iterator();
+                while (iterator.hasNext()) {
+                    Entry<SingleIdentifier, UnrefinedUsagePointSet> entry = iterator.next();
+                    UnrefinedUsagePointSet tmpList = entry.getValue();    //包含对特定id的topUsage和UsageInfoSets
+                    // 查看UsageInfoSets
+                    System.out.println("id: \u001b[32m" + entry.getKey().getName());
+                    int i = 0x2460;
+                    for (Entry<UsagePoint, UsageInfoSet> e : tmpList.getUsageInfoSets().entrySet()) {
+                        System.out.printf("\u001b[0m\t%CusageInfoSet size: %d\n", (i++), e.getValue().size());
+                        if (detector.isUnsafe(tmpList)) {                     //若对某个id计算出存在不安全
+                            System.out.println("\u001b[31mrace found!\u001b[0m\n");
+                            haveUnsafesIds.put(entry.getKey(), entry.getValue()); //将该id添加到haveUnsafesIds中
+                        }
+                    }
+
+                }
             }
         }
 

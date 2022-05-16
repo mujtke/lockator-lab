@@ -22,6 +22,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+
+import org.sosy_lab.cpachecker.core.interfaces.Graphable;
 import org.sosy_lab.cpachecker.cpa.lock.effects.AcquireLockEffect;
 import org.sosy_lab.cpachecker.cpa.lock.effects.GenericLockEffectWithId;
 import org.sosy_lab.cpachecker.cpa.lock.effects.LockEffectWithId;
@@ -29,7 +31,17 @@ import org.sosy_lab.cpachecker.cpa.usage.CompatibleNode;
 import org.sosy_lab.cpachecker.cpa.usage.CompatibleState;
 import org.sosy_lab.cpachecker.cpa.usage.storage.Delta;
 
-public final class LockState extends AbstractLockState {
+public final class LockState extends AbstractLockState implements Graphable {
+
+  @Override
+  public String toDOTLabel() {
+    return "locks: " + locks.toString();
+  }
+
+  @Override
+  public boolean shouldBeHighlighted() {
+    return locks.isEmpty() ? false : true;
+  }
 
   public static class LockTreeNode implements CompatibleNode {
 

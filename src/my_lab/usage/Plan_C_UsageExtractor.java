@@ -112,6 +112,8 @@ public class Plan_C_UsageExtractor {
         // Waitlist to be sure in order (not start from the middle point)
         while (!stateWaitlist.isEmpty()) {
             ARGState argState = (ARGState) stateWaitlist.poll();
+            // TODO: debug
+            //System.out.println("extract usage: state " + argState.getStateId());
             if (stateToUsage.containsKey(argState)) {       // 该状态已经被分析过了
                 continue;
             }
@@ -120,8 +122,19 @@ public class Plan_C_UsageExtractor {
 
             if (needToDumpUsages(argState)) {     // 我们是否需要dump usages，感觉像是放置的意思
                 addingTimer.start();
+
+                // TODO: debug 0513
+                {
+                    final boolean DEBUG = false;
+                    if (DEBUG) {
+                        if (!expandedUsages.isEmpty()) {
+                            System.out.println("expandedUsages: " + expandedUsages.size());
+                        }
+                    }
+                }
+
                 for (UsageInfo usage : expandedUsages) {
-                    container.add(usage);             // container应该属于ConcurrentUsageExtractor，不过的确实是在这些dumped的usage中查找unsafe
+                    container.add(usage);
                     haveUsagesExtracted = true;
                 }
                 addingTimer.stop();

@@ -31,6 +31,7 @@ import org.sosy_lab.common.configuration.Option;
 import org.sosy_lab.common.configuration.Options;
 import org.sosy_lab.common.log.LogManager;
 import org.sosy_lab.common.time.Timer;
+import org.sosy_lab.cpachecker.cfa.model.CFANode;
 import org.sosy_lab.cpachecker.core.CPAcheckerResult.Result;
 import org.sosy_lab.cpachecker.core.defaults.MergeSepOperator;
 import org.sosy_lab.cpachecker.core.interfaces.AbstractState;
@@ -349,6 +350,7 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
     stats.maxSuccessors = Math.max(numSuccessors, stats.maxSuccessors);
 
     // 分析是否应该停止，是否有可能返回true
+    // 处理获取到的每一个后继状态
     for (Iterator<? extends AbstractState> it = successors.iterator(); it.hasNext();) {     //for each e' in (e,π) -> e'
       AbstractState successor = it.next();
       shutdownNotifier.shutdownIfNecessary();
@@ -466,16 +468,32 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
       if (stop) {   // 如果successor被覆盖，这里包含BDD覆盖和Location覆盖
         logger.log(Level.FINER, "Successor is covered or unreachable, not adding to waitlist");
         stats.countStop++;
+        // debug
+        //System.out.println("Successor is covered or unreachable");
         
       } else {    // !stop(e_hat, reached, π_hat)，如果successor没有被覆盖，则将successor及其对应的精度放到reachedSet中，同时也会将相应的successor放到Waitlist中
 
-        if (extractStateByType(successor, Plan_C_threadingState.class).locationCovered) { // 如果满足Location覆盖
+        // TODO: debug 判断当前状态是否被Location覆盖
+        Plan_C_threadingState suc = extractStateByType(successor, Plan_C_threadingState.class);
+        Iterable<CFANode> locs = suc.getLocationNodes();
+        Iterator<CFANode> ite = locs.iterator();
+        suc.locationCovered = true;
+        while (ite.hasNext()) {
+          if (!Plan_C_UsageReachedSet.visitedLocations.contains(ite.next())) {
+            suc.locationCovered = false;
+          }
+        }
+
+        // TODO: debug
+        if (suc.locationCovered) { // 如果满足Location覆盖
           /**
            * 将该状态暂时放到被覆盖列表中
            */
           ((Plan_C_UsageReachedSet)reachedSet).coveredStatesTable.put(successor, successorPrecision); //
           ((Plan_C_UsageReachedSet)reachedSet).addButSkipWaitlist(successor, successorPrecision); // 该状态需要添加到reachedSet中，否则会报找不到精度的问题（将状态重新放回Waitlist中时，状态的精度是丢失的）
           // 这里需要重写add方法，不要将状态放回到waitlist中去
+          // 如果是因为位置覆盖，则该后继状态应该放到newSuccessorsInEachIteration中去
+          ((Plan_C_UsageReachedSet) reachedSet).newSuccessorsInEachIteration.put(successor, successorPrecision);
         } else {
           logger.log(Level.FINER, "No need to stop, adding successor to waitlist");
 

@@ -202,25 +202,30 @@ public class Plan_C_UsageProcessor {
         assert stateWithLocations != null : "NullPoint exception";
         List<CFANode> nodes = new ArrayList<>();
         for (CFANode node : stateWithLocations.getLocationNodes()) {
-            if (!uselessNodes.contains(node)) { continue; }     // 如果pState属于uselessNodes，则获取Usage的结果为空
+            if (uselessNodes.contains(node)) { continue; }     // 如果pState中所有的LocationNode都属于uselessNodes，则获取Usage的结果为空
             else nodes.add(node);
         }
         if (nodes.isEmpty()) {  // 如果都是无用节点
             return result;
         }
+        //
 
         boolean resultComputed = false;
+        List<UsageInfo> tmpResult = new ArrayList<>();
+        CFANode currentEdgeNode = null;
 
         for (ARGState parentState : ((ARGState) pState).getParents()) {   // 获取Usage需要用到边
             CFAEdge edge = parentState.getEdgeToChild((ARGState)pState);
             if (edge != null) {    // 如果有CFA边连接
+                currentEdgeNode = edge.getSuccessor();
                 resultComputed = true;
                 Collection<Pair<AbstractIdentifier, Access>> ids;
 
                 if (usages.containsKey(edge)) {
                     ids = usages.get(edge);     // 如果这条边已经在usages中了，则从usages中获取相应的<id, Access>对
                 } else {                        // 如果这条边不在usages中，则进行新的计算
-                    ids = getUsagesForEdge(parentState, edge);  // parentState为当前状态的父状态，edge为两者之间所连的边
+                   //ids = getUsagesForEdge(parentState, edge);  // parentState为当前状态的父状态，edge为两者之间所连的边
+                    ids = getUsagesForEdge((ARGState)pState, edge);  // TODO: 改用当前状态作为参数，而不是使用parentState
                     if (!ids.isEmpty()) {
                         usages.put(edge, ids);  // 如果计算结果不为空，则将结果放入usages中
                     }
@@ -234,7 +239,7 @@ public class Plan_C_UsageProcessor {
                     // searchingCacheTimer.start();
                     // searchingCacheTimer.stop();
                     if (!redundantIds.contains(id)) {         // 如果id不是冗余的，冗余是指不重复？
-                        createUsages(id, edge.getSuccessor(), parentState, pair.getSecond(), result);    // 将相应的Usage放入result中
+                        createUsages(id, edge.getSuccessor(), (ARGState)pState, pair.getSecond(), tmpResult);    // 将相应的Usage放入tmpResult中
                     }
                 }
                 // usagePreparationTimer.stop();
@@ -243,17 +248,26 @@ public class Plan_C_UsageProcessor {
                 // No edge, for example, due to BAM
                 // Note, function call edge was already handled, we do not miss it
             }
-        }
-
-        if (resultComputed && result.isEmpty()) {
-            uselessNodes.addAll(nodes);         // 如果已经结算过但是result依然为空，将该State放入uselessNodes中
-            for (CFANode node : nodes) {
-                for (int i = 0; i < node.getNumEnteringEdges(); i++) {
-                    CFAEdge e = node.getEnteringEdge(i);
-                    usages.remove(e);          // 同时将从该State出发的边对应的usage从Usages中移除
+            if (resultComputed && tmpResult.isEmpty() && currentEdgeNode != null) {
+                uselessNodes.add(currentEdgeNode);         // 如果已经结算过但是result依然为空，将该State放入uselessNodes中
+//                for (CFANode node : nodes) {
+//                    for (int i = 0; i < node.getNumEnteringEdges(); i++) {
+//                        CFAEdge e = node.getEnteringEdge(i);
+//                        usages.remove(e);          // 同时将从该State出发的边对应的usage从Usages中移除
+//                    }
+//                }
+                for (int i = 0; i < currentEdgeNode.getNumEnteringEdges(); i++) {
+                    CFAEdge e = currentEdgeNode.getEnteringEdge(i);
+                    usages.remove(e);
                 }
+                resultComputed = false;
+                currentEdgeNode = null;
+            }
+            if (!tmpResult.isEmpty()) {
+                result.addAll(tmpResult);
             }
         }
+
         // totalTimer.stop();
         return result;
     }
@@ -432,8 +446,7 @@ public class Plan_C_UsageProcessor {
         return handler.getProcessedExpressions();     // 返回handler中的result
     }
 
-    private void
-    createUsages(
+    private void createUsages(
             AbstractIdentifier pId,
             CFANode pNode,
             AbstractState pChild,
@@ -545,6 +558,7 @@ public class Plan_C_UsageProcessor {
         result.add(usage);
     }
 
+    // TODO: debug 0511
     private String getCurrentFunction(AbstractState pState, CFAEdge pCfaEdge) {
         return extractStateByType(pState, Plan_C_threadingState.class).getCurrentFunction(pCfaEdge);
     }

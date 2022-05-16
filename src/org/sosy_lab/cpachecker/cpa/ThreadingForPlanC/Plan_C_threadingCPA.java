@@ -21,8 +21,6 @@ import org.sosy_lab.cpachecker.core.interfaces.AbstractState;
 import org.sosy_lab.cpachecker.core.interfaces.CPAFactory;
 import org.sosy_lab.cpachecker.core.interfaces.StateSpacePartition;
 import org.sosy_lab.cpachecker.core.interfaces.StopOperator;
-import org.sosy_lab.cpachecker.cpa.ThreadingForPlanC.Plan_C_threadingState;
-import org.sosy_lab.cpachecker.cpa.ThreadingForPlanC.Plan_C_threadingTransferRelatoin;
 
 public class Plan_C_threadingCPA extends AbstractCPA {
 
@@ -35,7 +33,7 @@ public class Plan_C_threadingCPA extends AbstractCPA {
     }
 
     public Plan_C_threadingCPA(Configuration config, LogManager pLogger, CFA pCfa) throws InvalidConfigurationException {
-        super("sep", "sep", new Plan_C_threadingTransferRelatoin(config, pCfa, pLogger));
+        super("sep", "sep", new Plan_C_threadingTransferRelation(config, pCfa, pLogger));
         stopOperator = new Plan_C_threadingStopOperator();
     }
 
@@ -45,7 +43,7 @@ public class Plan_C_threadingCPA extends AbstractCPA {
         // We create an empty ThreadingState and enter the main function with the first thread.
         // We use the main function's name as thread identifier.
         String mainThread = pNode.getFunctionName();
-        return ((Plan_C_threadingTransferRelatoin) getTransferRelation())
+        return ((Plan_C_threadingTransferRelation) getTransferRelation())
                 .addNewThread(new Plan_C_threadingState(), mainThread, Plan_C_threadingState.MIN_THREAD_NUM, mainThread);
     }
 

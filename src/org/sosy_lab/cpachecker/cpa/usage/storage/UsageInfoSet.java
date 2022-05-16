@@ -12,6 +12,7 @@ import com.google.common.collect.ForwardingSet;
 import com.google.common.collect.Iterables;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 import org.sosy_lab.cpachecker.core.interfaces.AbstractState;
 import org.sosy_lab.cpachecker.cpa.usage.UsageInfo;
@@ -21,11 +22,15 @@ public class UsageInfoSet extends ForwardingSet<UsageInfo> {
   private final Set<UsageInfo> usageSet;
 
   public UsageInfoSet() {
-    usageSet = new ConcurrentSkipListSet<>();
+    // TODO debug 0516
+    //usageSet = new ConcurrentSkipListSet<>();
+    usageSet = new TreeSet<>();
   }
 
   private UsageInfoSet(Set<UsageInfo> pSet) {
-    usageSet = new ConcurrentSkipListSet<>(pSet);
+    // TODO debug 0516
+    //usageSet = new ConcurrentSkipListSet<>(pSet);
+    usageSet = new TreeSet<>(pSet);
   }
 
   public boolean remove(UsageState pUstate) {
