@@ -61,7 +61,8 @@ public class Plan_C_UsageReachedSet extends PartitionedReachedSet {
 
     public LinkedHashMap<AbstractState, Precision> newSuccessorsInEachIteration;        // 用来存储每次迭代新产生的后继
 
-    public HashMap<AbstractState, Precision> coveredStatesTable;                   // 用来存放因为被覆盖的状态，这些状态可能在后面的过程中重新放回waitList中
+    //public HashMap<AbstractState, Precision> coveredStatesTable;                   // 用来存放因为被覆盖的状态，这些状态可能在后面的过程中重新放回waitList中
+    public TreeMap<AbstractState, Precision> coveredStatesTable;                   // 用来存放因为被覆盖的状态，这些状态可能在后面的过程中重新放回waitList中
 
     public AdjustablePrecision finalPrecision = new AdjustablePrecision() {             // 用来收集细化过程中产生的精度
         @Override
@@ -103,7 +104,8 @@ public class Plan_C_UsageReachedSet extends PartitionedReachedSet {
         plan_c_usageConfig = pConfig;
         newSuccessorsInEachIteration = new LinkedHashMap<>();
         processedUnsafes = new HashSet<>();
-        coveredStatesTable = new HashMap<>();
+        //coveredStatesTable = new HashMap<>();
+        coveredStatesTable = new TreeMap<>();
     }
 
     @Override

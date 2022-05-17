@@ -334,6 +334,9 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
       }
     }
 
+    if (((ARGState)state).getStateId() == 25) {
+      System.out.println("");
+    }
     stats.transferTimer.start();
     Collection<? extends AbstractState> successors;
     try {

@@ -108,7 +108,8 @@ public final class UsageInfo implements Comparable<UsageInfo> {
         for (CFANode n : parentStateWithLocs.getLocationNodes()) { parentLocs.add(n); }
         childLocs.removeAll(parentLocs);
         if (!childLocs.isEmpty()) {
-          assert childLocs.size() == 1 : "get location error";
+          // TODO: debug 0516 这里的修改不确定是否正确
+          //assert childLocs.size() == 1 : "get location error";
           node = (CFANode)childLocs.toArray()[0];
         }
       }

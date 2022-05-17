@@ -155,6 +155,7 @@ solver.z3.usePhantomReferences = false
 # SPDX-FileCopyrightText: 2007-2020 Dirk Beyer <https://www.sosy-lab.org>
 # SPDX-FileCopyrightText: 2014-2017 Université Grenoble Alpes
 # SPDX-FileCopyrightText: 2020 Dirk Beyer <https://www.sosy-lab.org>
+# SPDX-FileCopyrightText: 2022 Dirk Beyer <https://www.sosy-lab.org>
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -170,6 +171,8 @@ algorithm.parallelBam.numberOfThreads = -1
 
 # export number of running RSE instances as CSV
 algorithm.parallelBam.runningRSESeriesFile = "RSESeries.csv"
+
+# 不同的可达集合类型，为Plan_C设置其对应的PlAN_C_USAGE
 
 # use a BMC like algorithm that checks for satisfiability after the analysis
 # has finished, works only with PredicateCPA
@@ -248,6 +251,9 @@ analysis.algorithm.undefinedFunctionCollector = false
 
 # run the parallel BAM algortihm.
 analysis.algorithm.useParallelBAM = false
+
+# use algorithm for Plan_C
+analysis.algorithm.usePlan_C_Algorithm = false
 
 # If not already done by the analysis, store a found counterexample in the
 # ARG for later re-use. Does nothing if no ARGCPA is used
@@ -351,7 +357,8 @@ analysis.programNames = []
 # states' lattice (maybe faster for some special analyses which use merge_sep
 # and stop_sep
 analysis.reachedSet = PARTITIONED
-  enum:     [NORMAL, LOCATIONMAPPED, PARTITIONED, PSEUDOPARTITIONED, USAGE]
+  enum:     [NORMAL, LOCATIONMAPPED, PARTITIONED, PSEUDOPARTITIONED, USAGE,
+             PLAN_C_USAGE]
 
 # use thread-modular wrapper to support thread-modular approach
 analysis.reachedSet.useThreadModularWrapper = false
@@ -1082,6 +1089,31 @@ coverage.file = "coverage.info"
 
 # CPA to use (see doc/Configuration.md for more documentation on this)
 cpa = CompositeCPA.class.getCanonicalName()
+
+# allow assignments of a new thread to the same left-hand-side as an existing
+# thread.
+cpa.ThreadingForPlanC.allowMultipleLHS = false
+
+# the maximal number of parallel threads, -1 for infinite. When combined with
+# 'useClonedFunctions=true', we need at least N cloned functions. The option
+# 'cfa.cfaCloner.numberOfCopies' should be set to N.
+cpa.ThreadingForPlanC.maxNumberOfThreads = 5
+
+# in case of witness validation we need to check all possible function calls
+# of cloned CFAs.
+cpa.ThreadingForPlanC.useAllPossibleClones = false
+
+# atomic locks are used to simulate atomic statements, as described in the
+# rules of SV-Comp.
+cpa.ThreadingForPlanC.useAtomicLocks = true
+
+# do not use the original functions from the CFA, but cloned ones. See
+# cfa.postprocessing.CFACloner for detail.
+cpa.ThreadingForPlanC.useClonedFunctions = true
+
+# local access locks are used to avoid expensive interleaving, if a thread
+# only reads and writes its own variables.
+cpa.ThreadingForPlanC.useLocalAccessLocks = true
 
 # Where to perform abstraction
 cpa.abe.abstractionLocations = LOOPHEAD
@@ -3678,6 +3710,78 @@ mpv.partitionOperator = no default value
 # - AUTOMATON: each automaton represent a single property.
 mpv.propertySeparator = FILE
   enum:     [FILE, AUTOMATON]
+
+# functions, which stops analysis
+my_lab.usage.abortFunctions = {}
+
+# bind arguments of functions with passed variables
+my_lab.usage.bindArgsFunctions = false
+
+# functions, which are used to bind variables (like list elements are binded
+# to list variable)
+my_lab.usage.binderFunctions = {}
+
+# a list of functions, which do not produce notes
+my_lab.usage.disableNotesFor = {}
+
+# export counterexample core as text file
+my_lab.usage.export.witnessTemplate = "witness.%s.graphml"
+
+# path to write results
+my_lab.usage.falseUnsafesOutput = "FalseUnsafes"
+
+# do not use initial variable in analysis if found an alias for it
+my_lab.usage.filterAliases = true
+
+# if a file do not exist, do not include the corresponding edge
+my_lab.usage.filterMissedFiles = false
+
+# filter unsafes, which are too similar
+my_lab.usage.filterSimilarUnsafes = false
+
+# all variables should be printed to the one file or to the different
+my_lab.usage.outputType = no default value
+  enum:     [ETV, KLEVER, KLEVER3, KLEVER_OLD]
+
+# A path to precision
+my_lab.usage.precision = "localsave"
+
+# print unsafes with empty lock states
+my_lab.usage.printEmptyLockStates = true
+
+# print all unsafe cases in report
+my_lab.usage.printFalseUnsafes = false
+
+# output only true unsafes
+my_lab.usage.printOnlyTrueUnsafes = false
+
+# print found unsafes in case of unknown verdict
+my_lab.usage.printUnsafesIfUnknown = true
+
+# Should we process the same blocks with covered sets of locks
+my_lab.usage.processCoveredUsages = true
+
+# functions, which we don't analize
+my_lab.usage.skippedfunctions = {}
+
+# ignore unsafes only with empty callstacks
+my_lab.usage.unsafedetector.ignoreEmptyLockset = true
+
+# A name of interrupt lock for checking deadlock free
+my_lab.usage.unsafedetector.intLock = no default value
+
+# defines what is unsafe
+my_lab.usage.unsafedetector.unsafeMode = RACE
+  enum:     [RACE, DEADLOCKCIRCULAR, DEADLOCKDISPATCH]
+
+# Use several threads for usage extraction
+my_lab.usage.useConcurrentExtraction = true
+
+# use sound regions as identifiers
+my_lab.usage.useSoundRegions = false
+
+# functions, which are marked as write access
+my_lab.usage.writeAccessFunctions = {}
 
 # When checking for the overflow property, use this configuration file
 # instead of the current one.

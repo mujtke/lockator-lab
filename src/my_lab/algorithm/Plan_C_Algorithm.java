@@ -30,6 +30,7 @@ import org.sosy_lab.common.time.Timer;
 import org.sosy_lab.cpachecker.cfa.model.CFANode;
 import org.sosy_lab.cpachecker.core.CPAcheckerResult.Result;
 import org.sosy_lab.cpachecker.core.algorithm.Algorithm;
+import org.sosy_lab.cpachecker.core.algorithm.CEGARAlgorithm;
 import org.sosy_lab.cpachecker.core.algorithm.ParallelAlgorithm.ReachedSetUpdateListener;
 import org.sosy_lab.cpachecker.core.algorithm.ParallelAlgorithm.ReachedSetUpdater;
 import org.sosy_lab.cpachecker.core.interfaces.*;
@@ -43,7 +44,7 @@ import org.sosy_lab.cpachecker.exceptions.CPAException;
 
 public class Plan_C_Algorithm implements Algorithm, StatisticsProvider, ReachedSetUpdater {
 
-    private static class CEGARStatistics implements Statistics {
+    private static class Plan_C_Statistics implements Statistics {
 
         private final Timer totalTimer = new Timer();
 
@@ -58,18 +59,18 @@ public class Plan_C_Algorithm implements Algorithm, StatisticsProvider, ReachedS
         }
     }
 
-    private class Plan_C_AlgorithmBean extends AbstractMBean {
-        public Plan_C_AlgorithmBean() {
-            super("my_lab.algorithm:type=Plan_C_algorithm", logger);
-        }
-    }
+//    private class Plan_C_AlgorithmBean extends AbstractMBean {
+//        public Plan_C_AlgorithmBean() {
+//            super("my_lab.algorithm:type=Plan_C_algorithm", logger);
+//        }
+//    }
 
-    private final my_lab.algorithm.Plan_C_Algorithm.CEGARStatistics stats = new my_lab.algorithm.Plan_C_Algorithm.CEGARStatistics();
+    private final my_lab.algorithm.Plan_C_Algorithm.Plan_C_Statistics stats = new my_lab.algorithm.Plan_C_Algorithm.Plan_C_Statistics();
 
     private final List<ReachedSetUpdateListener> reachedSetUpdateListeners =
             new CopyOnWriteArrayList<>();
 
-    @Options(prefix = "cegar")
+    @Options(prefix = "Plan_C_Algorithm")
     public static class Plan_C_AlgorithmFactory implements AlgorithmFactory {
 
         private final AlgorithmFactory algorithmFactory;
@@ -115,7 +116,8 @@ public class Plan_C_Algorithm implements Algorithm, StatisticsProvider, ReachedS
         logger = pLogger;
 
         // don't store it because we wouldn't know when to unregister anyway
-        new my_lab.algorithm.Plan_C_Algorithm.Plan_C_AlgorithmBean().register();
+        // TODO: debug 0516
+        //new my_lab.algorithm.Plan_C_Algorithm.Plan_C_AlgorithmBean().register();
     }
 
     /**
@@ -170,6 +172,12 @@ public class Plan_C_Algorithm implements Algorithm, StatisticsProvider, ReachedS
                 }
 
                 notifyReachedSetUpdateListeners(reached);
+                // TODO: debug 0517
+                {
+                    if (!((Plan_C_UsageReachedSet)reached).newSuccessorsInEachIteration.isEmpty()) {
+                        exportARG(reached, "./output/thread_test/debug/_" + "2_" + iteration++ + ".dot");
+                    }
+                }
                 if (haveUnsafeOrNot(reached) == true) {                         // 如果发现了race
                     //System.out.println("race found");
                     ((Plan_C_UsageReachedSet) reached).setHaveUnsafes(true);           // 将可达集合含有不安全设置为true
@@ -197,11 +205,11 @@ public class Plan_C_Algorithm implements Algorithm, StatisticsProvider, ReachedS
         } finally {
             stats.totalTimer.stop();
             // 打印一下CEGAR算法的总时间
-            //System.out.println("Total time for CEGAR algorithm:   " + stats.totalTimer);
-            //System.out.println("reached.size:  " + reached.size());
+            System.out.println("Total time for CEGAR algorithm:   " + stats.totalTimer);
+            System.out.println("reached.size:  " + reached.size());
 
             // 打印一下threading对应的ARG
-            //exportARG(reached, "./output/thread_test/debug/_" + "thread16_.dot");
+            exportARG(reached, "./output/thread_test/debug/_" + "thread16_.dot");
 
         }
         return status;

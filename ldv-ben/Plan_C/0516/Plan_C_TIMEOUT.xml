@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<!DOCTYPE benchmark PUBLIC "+//IDN sosy-lab.org//DTD BenchExec benchmark 1.0//EN" "http://www.sosy-lab.org/benchexec/benchmark-1.0.dtd">
+<benchmark tool="cpachecker" timelimit="900" hardtimelimit="2000" cpuCores="1" threads="50">
+  <!-- This file contains regression tests from the LDV project.
+       It expects the git repository git@bitbucket.org:dbeyer/ldv-benchmarks.git
+       to be checked out at test/programs/ldv-benchmarks. -->
+
+  <!--<option name="-setprop">statistics.memory=true</option>-->
+  <option name="-heap">10000M</option>
+  <option name="-setprop">counterexample.export.exportWitness=false</option>
+  <option name="-setprop">cpa.thread.skipTheSameThread=true</option>
+  <option name="-setprop">cpa.arg.export=false</option>
+  <option name="-setprop">counterexample.export.exportAsSource=false</option>
+  <option name="-setprop">cpa.lock.refinement=false</option>
+  <!-- <option name="-benchmark" /> -->
+
+  <propertyfile>data-race.prp</propertyfile>
+
+  <tasks name="DeviceDrivers64">
+    <includesfile>Plan_C_TIMEOUT.set</includesfile>
+  </tasks>
+
+  <rundefinition name="Plan_C_TIMEOUT">
+          <option name="-config">./config/MyConfigure/Plan_C/Plan_C_exp.properties</option>
+    <option name="-setprop">cpa=cpa.arg.ARGCPA</option>
+    <option name="-setprop">ARGCPA.cpa=my_lab.usage.Plan_C_UsageCPA</option>
+    <option name="-setprop">Plan_C_UsageCPA.cpa = cpa.composite.CompositeCPA</option>
+    <option name="-setprop">CompositeCPA.cpas = cpa.bdd.BDDCPA, cpa.ThreadingForPlanC.Plan_C_threadingCPA, cpa.lock.LockCPA, cpa.functionpointer.FunctionPointerCPA</option>
+    <option name="-benchmark"/>
+  </rundefinition>
+</benchmark>
